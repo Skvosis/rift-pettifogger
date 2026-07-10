@@ -1,5 +1,6 @@
 import "./styles.css";
-import { loadDataset, buildSearchIndex, searchTeams, type Dataset, type SearchEntry } from "./data";
+import { loadDataset, type Dataset } from "./data";
+import { resolveLogos } from "./logos";
 import type { Team } from "../shared/types";
 import type { Argument, Filters, Scope, Tally, Verdict } from "./engine/types";
 import { defaultFilters, encodeState, decodeState, resolvedEnd } from "./engine/filters";
@@ -26,7 +27,7 @@ const $ = <T extends Element>(sel: string, root: ParentNode = document): T => ro
 
 // ---------- 状态 ----------
 let dataset: Dataset;
-let searchIndex: SearchEntry[];
+let regionGroups: { region: string; label: string; teams: Team[] }[] = [];
 const selected: { a: string | null; b: string | null } = { a: null, b: null };
 let lastVerdict: Verdict | null = null;
 
@@ -40,7 +41,7 @@ async function init() {
     $("#data-status").textContent = "数据加载失败：" + String(e);
     return;
   }
-  searchIndex = buildSearchIndex(dataset.teams);
+  regionGroups = groupByRegion(dataset.teams);
   const { years, counts } = dataset.index;
   $("#data-status").textContent = `已载入 ${counts.series.toLocaleString()} 场对阵、${counts.teams} 支战队（${years[0]}–${years[years.length - 1]}）。`;
 
@@ -54,62 +55,187 @@ async function init() {
   restoreFromUrl();
 }
 
-// ---------- 战队选择器 ----------
+// ---------- 战队选择器（两级：赛区 → 战队） ----------
+
+/** 赛区排序与中文标签。 */
+const REGION_META: { match: string[]; label: string }[] = [
+  { match: ["China"], label: "LPL 中国" },
+  { match: ["Korea"], label: "LCK 韩国" },
+  { match: ["EMEA", "Europe"], label: "LEC 欧洲" },
+  { match: ["North America", "Americas"], label: "LCS/LTA 美洲" },
+  { match: ["Vietnam"], label: "VCS 越南" },
+  { match: ["Asia-Pacific", "PCS"], label: "PCS 亚太" },
+  { match: ["Brazil"], label: "CBLOL 巴西" },
+  { match: ["Latin America", "Latin America North", "Latin America South"], label: "LLA 拉美" },
+  { match: ["Japan"], label: "LJL 日本" },
+  { match: ["Oceania"], label: "LCO 大洋洲" },
+  { match: ["Turkey", "Türkiye (Turkey)"], label: "TCL 土耳其" },
+];
+
+function regionLabel(region: string): { label: string; order: number } {
+  for (let i = 0; i < REGION_META.length; i++) {
+    if (REGION_META[i].match.includes(region)) return { label: REGION_META[i].label, order: i };
+  }
+  return { label: region || "其他", order: REGION_META.length + (region ? 0 : 1) };
+}
+
+function groupByRegion(teams: Team[]): { region: string; label: string; teams: Team[] }[] {
+  const map = new Map<string, Team[]>();
+  for (const t of teams) {
+    const key = t.region || "";
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push(t);
+  }
+  return [...map.entries()]
+    .map(([region, list]) => ({
+      region,
+      ...regionLabel(region),
+      teams: list.sort((a, b) => a.display_name.localeCompare(b.display_name)),
+    }))
+    .sort((a, b) => a.order - b.order || a.label.localeCompare(b.label))
+    .map(({ region, label, teams }) => ({ region, label, teams }));
+}
+
+/** 曾用名列表（去重、剔除与显示名相同者，最多 3 个）。 */
+function formerNames(t: Team): string[] {
+  const seen = new Set<string>([t.display_name.toLowerCase()]);
+  const out: string[] = [];
+  for (const a of t.aliases) {
+    const k = a.toLowerCase();
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(a);
+    if (out.length >= 3) break;
+  }
+  return out;
+}
+
+function teamRow(t: Team, onPick: (t: Team) => void): HTMLElement {
+  const former = formerNames(t);
+  const li = h("li", { class: "team-row" } as any, [
+    logoEl(t.canonical_id, t.display_name),
+    h("span", { class: "team-name" }, [
+      t.display_name,
+      ...(former.length ? [h("span", { class: "former" }, [`（曾用名 ${former.join("、")}）`])] : []),
+    ]),
+  ]);
+  li.addEventListener("click", () => onPick(t));
+  return li;
+}
+
+/** 队标元素：先放首字母头像，异步解析到 URL 后替换。 */
+function logoEl(teamId: string, display: string): HTMLElement {
+  const holder = h("span", { class: "team-logo" }, [display.slice(0, 2)]);
+  pendingLogoIds.add(teamId);
+  logoHolders.set(teamId, holder);
+  scheduleLogoResolve();
+  return holder;
+}
+
+const pendingLogoIds = new Set<string>();
+const logoHolders = new Map<string, HTMLElement>();
+let logoTimer: number | undefined;
+function scheduleLogoResolve() {
+  clearTimeout(logoTimer);
+  logoTimer = window.setTimeout(async () => {
+    const ids = [...pendingLogoIds];
+    pendingLogoIds.clear();
+    if (!ids.length) return;
+    const urls = await resolveLogos(ids);
+    for (const [id, url] of urls) {
+      const holder = logoHolders.get(id);
+      if (!holder) continue;
+      const img = h("img", { src: url, alt: "", loading: "lazy" } as any);
+      img.className = "team-logo img";
+      holder.replaceWith(img);
+      logoHolders.set(id, img);
+    }
+  }, 80);
+}
+
+function setTrigger(side: "a" | "b", team: Team | null) {
+  const root = $<HTMLElement>(`.combo[data-side="${side}"]`);
+  const trigger = $<HTMLButtonElement>(".combo-trigger", root);
+  if (team) {
+    trigger.replaceChildren(logoEl(team.canonical_id, team.display_name), h("span", {}, [team.display_name]));
+    root.classList.add("selected");
+  } else {
+    trigger.replaceChildren(h("span", { class: "placeholder" }, ["选择战队…"]));
+    root.classList.remove("selected");
+  }
+}
+
 function setupCombo(side: "a" | "b") {
   const root = $<HTMLElement>(`.combo[data-side="${side}"]`);
-  const input = $<HTMLInputElement>(".combo-input", root);
-  const list = $<HTMLUListElement>(".combo-list", root);
-  let activeIdx = -1;
-  let current: Team[] = [];
+  const trigger = $<HTMLButtonElement>(".combo-trigger", root);
+  const panel = $<HTMLElement>(".combo-panel", root);
+  const filter = $<HTMLInputElement>(".combo-filter", root);
+  const regionList = $<HTMLUListElement>(".region-list", root);
+  const teamList = $<HTMLUListElement>(".team-list", root);
+  let activeRegion = 0;
 
-  const close = () => {
-    list.hidden = true;
-    activeIdx = -1;
-  };
-  const render = () => {
-    current = searchTeams(searchIndex, input.value, 8);
-    list.replaceChildren(
-      ...current.map((t, i) =>
-        h("li", { class: i === activeIdx ? "active" : "", onclick: () => pick(t) } as any, [
-          h("span", {}, [t.display_name]),
-          h("span", { class: "region" }, [t.region || ""]),
-        ]),
-      ),
-    );
-    list.hidden = current.length === 0;
-  };
   const pick = (t: Team) => {
     selected[side] = t.canonical_id;
-    input.value = t.display_name;
-    root.classList.add("selected");
+    setTrigger(side, t);
     close();
   };
 
-  input.addEventListener("input", () => {
-    selected[side] = null;
-    root.classList.remove("selected");
-    activeIdx = -1;
-    render();
-  });
-  input.addEventListener("focus", () => {
-    if (input.value && !selected[side]) render();
-  });
-  input.addEventListener("keydown", (e) => {
-    if (list.hidden) return;
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      activeIdx = Math.min(activeIdx + 1, current.length - 1);
-      render();
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      activeIdx = Math.max(activeIdx - 1, 0);
-      render();
-    } else if (e.key === "Enter") {
-      e.preventDefault();
-      if (current[activeIdx]) pick(current[activeIdx]);
-      else if (current[0]) pick(current[0]);
-    } else if (e.key === "Escape") {
-      close();
+  const renderRegions = () => {
+    regionList.replaceChildren(
+      ...regionGroups.map((g, i) => {
+        const li = h("li", { class: i === activeRegion ? "active" : "" } as any, [
+          g.label,
+          h("span", { class: "count" }, [String(g.teams.length)]),
+        ]);
+        li.addEventListener("click", () => {
+          activeRegion = i;
+          renderRegions();
+          renderTeams();
+        });
+        return li;
+      }),
+    );
+  };
+
+  const renderTeams = () => {
+    const q = filter.value.trim().toLowerCase();
+    if (q) {
+      // 过滤模式：跨赛区全量筛（支持曾用名）
+      const matched: Team[] = [];
+      for (const g of regionGroups) {
+        for (const t of g.teams) {
+          const hay = [t.display_name, t.canonical_id, ...t.aliases].join(" ").toLowerCase();
+          if (hay.includes(q)) matched.push(t);
+          if (matched.length >= 40) break;
+        }
+      }
+      teamList.replaceChildren(
+        ...(matched.length ? matched.map((t) => teamRow(t, pick)) : [h("li", { class: "none" }, ["无匹配战队"])]),
+      );
+    } else {
+      const g = regionGroups[activeRegion];
+      teamList.replaceChildren(...(g ? g.teams.map((t) => teamRow(t, pick)) : []));
+    }
+  };
+
+  const open = () => {
+    panel.hidden = false;
+    filter.value = "";
+    renderRegions();
+    renderTeams();
+    filter.focus();
+  };
+  const close = () => {
+    panel.hidden = true;
+  };
+
+  trigger.addEventListener("click", () => (panel.hidden ? open() : close()));
+  filter.addEventListener("input", renderTeams);
+  filter.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") close();
+    if (e.key === "Enter") {
+      const first = teamList.querySelector<HTMLElement>(".team-row");
+      first?.click();
     }
   });
   document.addEventListener("click", (e) => {
@@ -338,8 +464,8 @@ async function onShare() {
 function onReset() {
   selected.a = selected.b = null;
   lastVerdict = null;
-  document.querySelectorAll<HTMLInputElement>(".combo-input").forEach((i) => (i.value = ""));
-  document.querySelectorAll(".combo").forEach((c) => c.classList.remove("selected"));
+  setTrigger("a", null);
+  setTrigger("b", null);
   writeFilters(defaultFilters());
   $<HTMLElement>("#results").replaceChildren();
   history.replaceState(null, "", location.pathname);
@@ -356,15 +482,11 @@ function restoreFromUrl() {
   writeFilters(filters);
   if (a && dataset.teamById.has(a)) {
     selected.a = a;
-    const input = $<HTMLInputElement>('.combo[data-side="a"] .combo-input');
-    input.value = teamName(dataset.teamById, a);
-    $<HTMLElement>('.combo[data-side="a"]').classList.add("selected");
+    setTrigger("a", dataset.teamById.get(a)!);
   }
   if (b && dataset.teamById.has(b)) {
     selected.b = b;
-    const input = $<HTMLInputElement>('.combo[data-side="b"] .combo-input');
-    input.value = teamName(dataset.teamById, b);
-    $<HTMLElement>('.combo[data-side="b"]').classList.add("selected");
+    setTrigger("b", dataset.teamById.get(b)!);
   }
   if (selected.a && selected.b) onJudge();
 }

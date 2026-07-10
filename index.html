@@ -22,16 +22,28 @@
             <div class="team-field">
               <label>战队 A</label>
               <div class="combo" data-side="a">
-                <input class="combo-input" type="text" placeholder="搜索战队 / 别名…" autocomplete="off" />
-                <ul class="combo-list" hidden></ul>
+                <button type="button" class="combo-trigger"><span class="placeholder">选择战队…</span></button>
+                <div class="combo-panel" hidden>
+                  <input class="combo-filter" type="text" placeholder="筛选（可输入曾用名）…" autocomplete="off" />
+                  <div class="combo-panes">
+                    <ul class="region-list"></ul>
+                    <ul class="team-list"></ul>
+                  </div>
+                </div>
               </div>
             </div>
             <div class="vs">＞</div>
             <div class="team-field">
               <label>战队 B</label>
               <div class="combo" data-side="b">
-                <input class="combo-input" type="text" placeholder="搜索战队 / 别名…" autocomplete="off" />
-                <ul class="combo-list" hidden></ul>
+                <button type="button" class="combo-trigger"><span class="placeholder">选择战队…</span></button>
+                <div class="combo-panel" hidden>
+                  <input class="combo-filter" type="text" placeholder="筛选（可输入曾用名）…" autocomplete="off" />
+                  <div class="combo-panes">
+                    <ul class="region-list"></ul>
+                    <ul class="team-list"></ul>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

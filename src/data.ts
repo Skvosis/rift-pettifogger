@@ -32,38 +32,3 @@ export async function loadDataset(): Promise<Dataset> {
 export function displayName(teams: Map<string, Team>, id: string): string {
   return teams.get(id)?.display_name ?? id;
 }
-
-// ---------- 战队模糊搜索 ----------
-
-export interface SearchEntry {
-  team: Team;
-  haystack: string;
-}
-
-export function buildSearchIndex(teams: Team[]): SearchEntry[] {
-  return teams.map((t) => ({
-    team: t,
-    haystack: [t.display_name, t.canonical_id, ...t.aliases].join(" ").toLowerCase(),
-  }));
-}
-
-/** 简单子串 + 词首匹配打分搜索，返回按相关度排序的前 n 支队。 */
-export function searchTeams(index: SearchEntry[], query: string, n = 8): Team[] {
-  const q = query.trim().toLowerCase();
-  if (!q) return [];
-  const scored: { team: Team; score: number }[] = [];
-  for (const e of index) {
-    const name = e.team.display_name.toLowerCase();
-    let score = 0;
-    if (name === q) score = 1000;
-    else if (name.startsWith(q)) score = 500;
-    else if (e.haystack.includes(` ${q}`)) score = 200;
-    else if (e.haystack.includes(q)) score = 100;
-    if (score > 0) {
-      score -= name.length * 0.1; // 越短越优先
-      scored.push({ team: e.team, score });
-    }
-  }
-  scored.sort((a, b) => b.score - a.score);
-  return scored.slice(0, n).map((s) => s.team);
-}

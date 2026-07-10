@@ -25,7 +25,14 @@
       "Bash(curl -s http://localhost:5199/rift-pettifogger/data/index.json)",
       "Bash(curl -s -o /dev/null -w \"shell: %{http_code}\\\\n\" http://localhost:5199/rift-pettifogger/)",
       "Bash(curl -s http://localhost:5199/rift-pettifogger/src/main.ts -o /dev/null -w \"main.ts: %{http_code}\\\\n\")",
-      "Bash(git -c core.safecrlf=false commit -q -m 'fix: 论据卡逐局展开、rule3 标题空格、抓取工作流 rebase 防冲突 *)"
+      "Bash(git -c core.safecrlf=false commit -q -m 'fix: 论据卡逐局展开、rule3 标题空格、抓取工作流 rebase 防冲突 *)",
+      "WebSearch",
+      "WebFetch(domain:oracleselixir.com)",
+      "Bash(curl -s -L -A \"Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\)\" \"https://oracleselixir.com/tools/downloads\")",
+      "Bash(curl -s http://localhost:5199/rift-pettifogger/src/logos.ts -o /dev/null -w \"logos.ts: %{http_code}\\\\n\")",
+      "Bash(curl -s http://localhost:5199/rift-pettifogger/ -o /dev/null -w \"shell: %{http_code}\\\\n\")",
+      "Bash(curl -s -H \"User-Agent: Mozilla/5.0\" \"https://lol.fandom.com/api.php?action=query&format=json&origin=*&prop=imageinfo&iiprop=url&iiurlwidth=48&titles=File:T1logo%20square.png|File:Dplus%20Kialogo%20square.png|File:Bilibili%20Gaminglogo%20square.png\")",
+      "Bash(git -c core.safecrlf=false commit -q -m 'feat: 两级战队选择器（赛区→战队），带队标与括号内曾用名 *)"
     ]
   }
 }
