@@ -10,14 +10,14 @@
 
 纯静态网站，无后端、无数据库：
 
-- **数据**：GitHub Actions 每日抓取 [Leaguepedia](https://lol.fandom.com) Cargo API，把 series（大局）/ teams / 逐局数据提交为 `public/data/*.json`。
+- **数据**：主数据源为 [Oracle's Elixir](https://oracleselixir.com/tools/downloads) 按年 CSV（覆盖 2014 至今、所有主要联赛，每日更新）。GitHub Actions 每日只增量拉取**当年** CSV，重建当年 JSON 并提交 `public/data/*.json`；历史年份 JSON 已入库，无需重复下载。队标来自 Leaguepedia 图片 API（浏览器端按需解析）。
 - **规则引擎**：所有规则计算与图搜索都在浏览器端运行（边依赖过滤器状态，必须运行时生成）。
 - **可复现**：全部过滤器状态编码进 URL，一条链接即可复现判案结果。
 
 ### 规则
 
 | 规则 | 含义 |
-|---|---|
+| --- | --- |
 | 1 直接交手 | 时间窗内最近一次 series 的胜者得一条边（Bo1 计入） |
 | 2 共同对手 | 经由共同对手 C 比较：同赛制比比分，跨赛制比表现档位（可开严格模式） |
 | 3 历史战绩 | A vs B 胜率严格 > 2/3 得边；范围可自动从宽到窄降级并强制标注口径 |
@@ -35,34 +35,39 @@ npm run build      # 类型检查 + 生产构建
 npm run preview    # 预览生产构建
 ```
 
-### 抓取数据
+### 更新数据
 
 ```bash
-npm run scrape                       # 增量更新当年
-npm run scrape -- --from=2021 --to=2025   # 指定年份区间
-npm run scrape -- --full             # 全量 2013 至今
-npm run scrape -- --no-games         # 跳过逐局数据
+npm run data:fetch                   # 下载当年 OE CSV 到 data/（增量）
+npm run data:fetch -- --year=2025    # 指定年份
+npm run data:build                   # data/*.csv 全量重建 public/data JSON
+npm run data:build -- --years=2026   # 只重建指定年份（teams/index 自动全局合并）
 ```
 
-> Leaguepedia 匿名接口限速较严，脚本内置指数退避 + 抖动。本地大批量抓取可能较慢；生产数据由 GitHub Actions（`.github/workflows/scrape.yml`）每日自动更新，或用 workflow_dispatch 手动全量重建。
+> 每日增量由 GitHub Actions（`.github/workflows/scrape.yml`）自动执行：拉当年 CSV → 重建当年 JSON → 有变化则提交（随后自动触发 Pages 部署）。OE 的 Drive 托管偶发下载配额超限，脚本会跳过当天、次日重试。历史年份 JSON 已入库，无需重复抓取；如需全量重建，把各年 CSV 放入 `data/` 后跑 `npm run data:build`。
+>
+> `npm run scrape:cargo` 保留了 Leaguepedia Cargo API 的备用抓取管道（限速较严，不作为默认路径）。
 
-### 别名归并
+### 实体归并（换血不换队）
 
-战队以品牌为单位、换血不换队。归并来源：
+1. OE 对“页面移动型”改名已自动统一（DAMWON Gaming → Dplus Kia、DRX → Kiwoom DRX、Misfits → Team Heretics）。
+2. `public/data/overrides.json` 处理其余分页型改名 / 收购（如 SK Telecom T1 → T1、Samsung Galaxy → Gen.G、Suning → Weibo Gaming）。发现该合并而未合并的实体，在 `merge` 补一行并重跑 `data:build` 即可；`teams[].aliases` 控制选择器里展示的曾用名。
 
-1. `TeamRedirects._pageName` —— Leaguepedia 页面移动型改名（如 DAMWON Gaming → Dplus Kia）。
-2. `public/data/overrides.json` —— Leaguepedia 分成两页的改名 / 收购兜底（如 SK Telecom T1 → T1）。抓取后若发现明显该合并而未合并的实体，补进 `merge`。
+### 已知数据边界
+
+- OE 对 LPL 的覆盖从 2016 年中开始，2014–2015 年 LPL 缺失；2014 年韩国赛区缺失（2015 年在 OGN 标签下）。
+- 弃权 / 重赛在 OE 中不单独标注，按官方计分结果计入。
 
 ## 目录
 
-```
-scripts/     数据管道（Cargo 客户端、赛事筛选、别名、转换、主入口）
+```text
+scripts/     数据管道（OE CSV 解析、series 重建、增量下载；cargo* 为 Leaguepedia 备用）
 shared/      前后端共用数据模型类型
 src/engine/  规则引擎（纯函数）+ 图搜索 + 过滤器 + 嘴硬模式
 src/ui/      论据描述、一键复制文本
-src/         数据加载、主应用
+src/         数据加载、主应用、两级选择器、队标解析
 tests/       规则引擎单元测试
-public/data/ 抓取产物 JSON
+public/data/ 构建产物 JSON（series/games 按年分片 + teams + index + overrides）
 ```
 
 ## 免责声明

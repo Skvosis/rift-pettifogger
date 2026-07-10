@@ -70,6 +70,9 @@ const REGION_META: { match: string[]; label: string }[] = [
   { match: ["Japan"], label: "LJL 日本" },
   { match: ["Oceania"], label: "LCO 大洋洲" },
   { match: ["Turkey", "Türkiye (Turkey)"], label: "TCL 土耳其" },
+  { match: ["Taiwan"], label: "LMS 台湾" },
+  { match: ["Southeast Asia"], label: "GPL 东南亚" },
+  { match: ["CIS"], label: "LCL 独联体" },
 ];
 
 function regionLabel(region: string): { label: string; order: number } {
@@ -426,7 +429,7 @@ function renderMouthHard(v: Verdict, base: Filters): HTMLElement {
         const row = h("div", { class: "suggestion" }, [
           h("div", { class: "labels" }, [
             document.createTextNode(s.changeLabels.join("，") || "调整过滤器"),
-            h("div", { class: "meta" }, [`${s.count} 条论据 · 最短 ${s.shortest} 跳`]),
+            h("div", { class: "meta" }, [`${s.count >= 5 ? "5+" : s.count} 条论据 · 最短 ${s.shortest} 跳`]),
           ]),
           h("button", { class: "btn ghost small" }, ["套用并判案"]),
         ]);

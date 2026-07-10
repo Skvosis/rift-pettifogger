@@ -93,11 +93,12 @@ export interface Verdict {
   hint?: string;
 }
 
-/** 边强度标量：规则档位 * BIG + 时间戳。规则档位始终压过时间。 */
+/** 边强度标量：规则档位 * BIG + 时间戳，规则档位始终压过时间。
+ * 规则 1（直接交手）最强，其次规则 2、规则 3，故取 (4 - rule) 作档位。 */
 const RULE_BASE = 1e13;
 export function edgeStrength(rule: RuleId, date: string): number {
   const t = Date.parse(date) || 0;
-  return rule * RULE_BASE + t;
+  return (4 - rule) * RULE_BASE + t;
 }
 
 /** series 是否落在时间窗内。 */
@@ -126,6 +127,8 @@ export function scopeDowngradeSequence(scope: Scope): Scope[] {
   return order.slice(start);
 }
 
-export function leaguepediaUrl(overviewPage: string): string {
-  return "https://lol.fandom.com/wiki/" + encodeURIComponent(overviewPage.replace(/ /g, "_"));
+/** 出处链接：赛事标签是 OE 风格（如 "LCK 2024 Spring Playoffs"），
+ * 无法可靠映射到 Leaguepedia 页面名，统一走站内搜索——首条结果即赛事页。 */
+export function leaguepediaUrl(tournamentLabel: string): string {
+  return "https://lol.fandom.com/wiki/Special:Search?query=" + encodeURIComponent(tournamentLabel);
 }

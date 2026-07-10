@@ -9,7 +9,9 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "scrape": "tsx scripts/scrape.ts",
+    "data:fetch": "tsx scripts/fetch-oe.ts",
+    "data:build": "tsx scripts/build-data.ts",
+    "scrape:cargo": "tsx scripts/scrape.ts",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

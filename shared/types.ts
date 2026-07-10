@@ -61,6 +61,6 @@ export interface DataIndex {
 export interface OverridesFile {
   /** 强制归并：把 key（任意别名）映射到 canonical_id。 */
   merge: Record<string, string>;
-  /** 战队展示名/赛区覆盖。 */
-  teams?: Record<string, { display_name?: string; region?: string }>;
+  /** 战队展示名/赛区/曾用名覆盖。 */
+  teams?: Record<string, { display_name?: string; region?: string; aliases?: string[] }>;
 }

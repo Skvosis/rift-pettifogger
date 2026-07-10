@@ -257,81 +257,85 @@ export function rule2(all: Series[], a: string, b: string, f: Filters): Edge[] {
 
 /**
  * 全局规则 2：一次性遍历所有共同对手 C，为每个 (X,Y,C) 产出至多一条边（时间最邻近对）。
- * 比逐对调用 rule2 高效得多，供建图使用。
+ * 对每个 C 的 series 按时间排序后做滑动窗口，只评估时间邻近的配对——
+ * 复杂度由 O(Σ|X|·|Y|) 降为 O(Σ 窗口内配对数)，全量数据下快一个量级以上。
  */
 export function rule2All(all: Series[], f: Filters): Edge[] {
   const pool = all.filter(
     (s) => inTimeWindow(s, f) && inScope(s, f.scope) && s.best_of >= 2,
   );
-  // 共同对手 C -> （对手 X -> X 对 C 的 series 列表）
-  const byOpponent = new Map<string, Map<string, Series[]>>();
+  // 共同对手 C -> C 参与的 series（视角：对手是谁）
+  const byC = new Map<string, { opp: string; s: Series; t: number }[]>();
   for (const s of pool) {
-    addOpp(byOpponent, s.t2, s.t1, s); // C=t2, X=t1
-    addOpp(byOpponent, s.t1, s.t2, s); // C=t1, X=t2
+    const t = Date.parse(s.date);
+    push(byC, s.t1, { opp: s.t2, s, t });
+    push(byC, s.t2, { opp: s.t1, s, t });
   }
-  const edges: Edge[] = [];
-  for (const [c, opponents] of byOpponent) {
-    const list = [...opponents.entries()];
-    for (let i = 0; i < list.length; i++) {
-      for (let j = i + 1; j < list.length; j++) {
-        const [x, xSeries] = list[i];
-        const [y, ySeries] = list[j];
-        const edge = bestPairEdge(x, y, c, xSeries, ySeries, f);
-        if (edge) edges.push(edge);
-      }
-    }
-  }
-  return edges;
-}
+  const windowMs = f.proximityDays * 24 * 3.6e6;
 
-/** 在 X、Y 各自对 C 的 series 中，找满足条件、时间最邻近的一对并产边。 */
-function bestPairEdge(
-  x: string,
-  y: string,
-  c: string,
-  xSeries: Series[],
-  ySeries: Series[],
-  f: Filters,
-): Edge | null {
-  let best: { edge: Edge; gap: number } | null = null;
-  for (const sx of xSeries) {
-    for (const sy of ySeries) {
-      const xEv = toEvidence(sx, x);
-      const yEv = toEvidence(sy, y);
-      if (!proximityOk(xEv, yEv, f.proximityDays)) continue;
-      const sameFormat = sx.best_of === sy.best_of;
+  const edges: Edge[] = [];
+  for (const [c, list] of byC) {
+    if (list.length < 2) continue;
+    list.sort((a, b) => a.t - b.t);
+    // 每对 (X,Y) 在此 C 下的最优（最邻近）候选
+    const best = new Map<string, { edge: Edge; gap: number }>();
+    const consider = (A: (typeof list)[0], B: (typeof list)[0]) => {
+      if (A.opp === B.opp) return;
+      const xEv = toEvidence(A.s, A.opp);
+      const yEv = toEvidence(B.s, B.opp);
+      if (!proximityOk(xEv, yEv, f.proximityDays)) return;
+      const sameFormat = A.s.best_of === B.s.best_of;
       const verdict = sameFormat
         ? sameFormatWinner(xEv, yEv)
         : crossFormatWinner(xEv, yEv, f.strict);
-      if (!verdict) continue;
-      const from = verdict.winner === "a" ? x : y;
-      const repDate = laterDate(sx.date, sy.date);
-      const edge: Edge = {
-        from,
-        to: from === x ? y : x,
-        rule: 2,
-        strength: edgeStrength(2, repDate),
-        date: repDate,
-        evidence: {
-          kind: "rule2",
-          via: c,
-          aSeries: from === x ? xEv : yEv,
-          bSeries: from === x ? yEv : xEv,
-          sameFormat,
-          note: verdict.note,
+      if (!verdict) return;
+      const from = verdict.winner === "a" ? A.opp : B.opp;
+      const to = from === A.opp ? B.opp : A.opp;
+      const repDate = laterDate(A.s.date, B.s.date);
+      const gap = Math.abs(B.t - A.t);
+      const key = A.opp < B.opp ? `${A.opp}|${B.opp}` : `${B.opp}|${A.opp}`;
+      const cur = best.get(key);
+      if (cur && cur.gap <= gap) return;
+      best.set(key, {
+        gap,
+        edge: {
+          from,
+          to,
+          rule: 2,
+          strength: edgeStrength(2, repDate),
+          date: repDate,
+          evidence: {
+            kind: "rule2",
+            via: c,
+            aSeries: from === A.opp ? xEv : yEv,
+            bSeries: from === A.opp ? yEv : xEv,
+            sameFormat,
+            note: verdict.note,
+          },
         },
-      };
-      const gap = Math.abs(Date.parse(sx.date) - Date.parse(sy.date));
-      if (!best || gap < best.gap) best = { edge, gap };
+      });
+    };
+    // 阶段 1：时间窗内的配对（滑动窗口）
+    for (let i = 0; i < list.length; i++) {
+      for (let j = i + 1; j < list.length && list[j].t - list[i].t <= windowMs; j++) {
+        consider(list[i], list[j]);
+      }
     }
+    // 阶段 2：同一赛事内的配对（自动满足邻近条件，可能跨越任意时长）
+    const byTournament = new Map<string, (typeof list)[0][]>();
+    for (const e of list) push(byTournament, e.s.tournament, e);
+    for (const group of byTournament.values()) {
+      if (group.length < 2) continue;
+      for (let i = 0; i < group.length; i++) {
+        for (let j = i + 1; j < group.length; j++) {
+          if (group[j].t - group[i].t > windowMs) consider(group[i], group[j]);
+          // 窗口内的已由阶段 1 覆盖
+        }
+      }
+    }
+    for (const { edge } of best.values()) edges.push(edge);
   }
-  return best?.edge ?? null;
-}
-
-function addOpp(m: Map<string, Map<string, Series[]>>, c: string, x: string, s: Series) {
-  let inner = m.get(c);
-  if (!inner) m.set(c, (inner = new Map()));
-  push(inner, x, s);
+  return edges;
 }
 
 function push<K, V>(m: Map<K, V[]>, k: K, v: V) {

@@ -1,6 +1,8 @@
 node_modules/
 dist/
 .claude/
+# OE 原始 CSV（~800MB，不入库；由 data:fetch 拉取）
+data/
 *.local
 .DS_Store
 .vite/

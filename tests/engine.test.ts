@@ -195,6 +195,20 @@ describe("图搜索与判案", () => {
     expect(v2.forward.length).toBe(0);
     expect(v2.hint).toBeTruthy();
   });
+  it("单边强度：规则 1 > 规则 2 > 规则 3（同长度论证排序）", () => {
+    // A 直接击败 B（规则1，较早）；A、B 与 C 的共同对手比较（规则2，较晚）
+    const data = [
+      s("A", "B", 2, 1, { date: "2024-01-10" }),
+      s("A", "C", 2, 0, { date: "2024-06-01" }),
+      s("B", "C", 2, 1, { date: "2024-06-02" }),
+    ];
+    const edges = buildEdges(data, F());
+    const args = findArguments("A", "B", edges);
+    const direct = args.filter((a) => a.path.length === 1);
+    expect(direct.length).toBeGreaterThanOrEqual(2);
+    // 尽管规则 2 的边时间更近，规则 1 仍应排在最前
+    expect(direct[0].path[0].rule).toBe(1);
+  });
   it("直接边按规则拆成多条论证", () => {
     // A 规则1 和 规则3 都指向 B
     const data = [s("A", "B", 2, 0), s("A", "B", 2, 1), s("A", "B", 2, 0)];

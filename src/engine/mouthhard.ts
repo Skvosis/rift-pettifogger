@@ -57,7 +57,8 @@ export function findWinningFilters(
     if (changeCount(base, f) === 0) continue; // 当前设置已在页面上判过
     evaluated++;
     const edges = buildEdges(series, f);
-    const args = findArguments(a, b, edges);
+    // 只做存在性检查（取前 5 条），不做全量枚举
+    const args = findArguments(a, b, edges, 5);
     if (!args.length) continue;
     found.push({
       filters: f,

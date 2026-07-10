@@ -6,7 +6,7 @@ on:
   # 抓取工作流用 GITHUB_TOKEN 提交数据时不会触发 push 事件（GitHub 防递归），
   # 因此监听其完成事件来部署新数据。
   workflow_run:
-    workflows: ["Scrape Leaguepedia data"]
+    workflows: ["Update match data"]
     types: [completed]
   workflow_dispatch:
 

@@ -1,8 +1,24 @@
 {
-  "_comment": "手工别名兜底。merge：把任意队名(或 TeamRedirects._pageName 解析后的当前队页)强制归并到目标 canonical_id，用于 Leaguepedia 分成两页、_pageName 无法覆盖的改名/收购。抓取后应抽查规范化队列表，把明显该合并而未合并的补进来。teams：覆盖展示名/赛区。",
+  "_comment": "手工归并兜底。OE 对『页面移动型』改名已自动统一（如 DAMWON→Dplus Kia、DRX→Kiwoom DRX、Misfits→Team Heretics），此处只处理其余分页型改名/收购。merge：旧名→canonical_id（品牌延续才合并，纯席位转卖不合并）。teams[].aliases：选择器里展示的曾用名。构建后如发现应并未并的实体，在 merge 里补一行重跑即可。",
   "merge": {
     "SK Telecom T1": "T1",
-    "SKT T1": "T1"
+    "Samsung Galaxy": "Gen.G",
+    "Suning": "Weibo Gaming",
+    "eStar": "Ultra Prime",
+    "KOI": "Rogue"
   },
-  "teams": {}
+  "teams": {
+    "T1": { "aliases": ["SK Telecom T1", "SKT"] },
+    "Gen.G": { "aliases": ["Samsung Galaxy", "KSV Esports"] },
+    "Weibo Gaming": { "aliases": ["Suning"] },
+    "Ultra Prime": { "aliases": ["eStar"] },
+    "Rogue": { "aliases": ["KOI"] },
+    "Dplus Kia": { "aliases": ["DWG KIA", "DAMWON Gaming"] },
+    "Kiwoom DRX": { "aliases": ["DRX", "DragonX"] },
+    "Team Heretics": { "aliases": ["Misfits Gaming"] },
+    "Bilibili Gaming": { "aliases": ["BLG"] },
+    "JD Gaming": { "aliases": ["JDG"] },
+    "Top Esports": { "aliases": ["TES"] },
+    "Royal Never Give Up": { "aliases": ["RNG"] }
+  }
 }

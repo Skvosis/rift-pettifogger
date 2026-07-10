@@ -1,20 +1,13 @@
-name: Scrape Leaguepedia data
+name: Update match data
 
 on:
   schedule:
-    # 每日 UTC 03:00（北京时间 11:00）增量更新当年数据
+    # 每日 UTC 03:00（北京时间 11:00）：拉取当年 OE CSV，增量重建当年 JSON
     - cron: "0 3 * * *"
   workflow_dispatch:
     inputs:
-      full:
-        description: "全量重建（2013 至今）而非仅当年增量"
-        type: boolean
-        default: false
-      from:
-        description: "起始年份（留空则 full=2013 / 增量=当年）"
-        required: false
-      to:
-        description: "截止年份（留空则当年）"
+      year:
+        description: "要更新的年份（留空 = 当年）"
         required: false
 
 permissions:
@@ -25,7 +18,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  scrape:
+  update-data:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -34,14 +27,16 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - name: Run scraper
+      - name: Fetch current-year CSV from Oracle's Elixir
         run: |
-          ARGS=""
-          if [ "${{ inputs.full }}" = "true" ]; then ARGS="$ARGS --full"; fi
-          if [ -n "${{ inputs.from }}" ]; then ARGS="$ARGS --from=${{ inputs.from }}"; fi
-          if [ -n "${{ inputs.to }}" ]; then ARGS="$ARGS --to=${{ inputs.to }}"; fi
-          echo "scrape args: $ARGS"
-          npm run scrape -- $ARGS
+          YEAR_ARG=""
+          if [ -n "${{ inputs.year }}" ]; then YEAR_ARG="--year=${{ inputs.year }}"; fi
+          npm run data:fetch -- $YEAR_ARG
+      - name: Rebuild JSON for the year
+        run: |
+          YEAR="${{ inputs.year }}"
+          if [ -z "$YEAR" ]; then YEAR=$(date -u +%Y); fi
+          npm run data:build -- --years=$YEAR
       - name: Commit updated data
         run: |
           git config user.name "github-actions[bot]"

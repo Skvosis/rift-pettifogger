@@ -32,7 +32,25 @@
       "Bash(curl -s http://localhost:5199/rift-pettifogger/src/logos.ts -o /dev/null -w \"logos.ts: %{http_code}\\\\n\")",
       "Bash(curl -s http://localhost:5199/rift-pettifogger/ -o /dev/null -w \"shell: %{http_code}\\\\n\")",
       "Bash(curl -s -H \"User-Agent: Mozilla/5.0\" \"https://lol.fandom.com/api.php?action=query&format=json&origin=*&prop=imageinfo&iiprop=url&iiurlwidth=48&titles=File:T1logo%20square.png|File:Dplus%20Kialogo%20square.png|File:Bilibili%20Gaminglogo%20square.png\")",
-      "Bash(git -c core.safecrlf=false commit -q -m 'feat: 两级战队选择器（赛区→战队），带队标与括号内曾用名 *)"
+      "Bash(git -c core.safecrlf=false commit -q -m 'feat: 两级战队选择器（赛区→战队），带队标与括号内曾用名 *)",
+      "Bash(awk -F',' 'NR>1 && $13==\"team\" {print $4}' 2024_LoL_esports_match_data_from_OraclesElixir.csv)",
+      "Bash(awk -F',' 'NR>1 && $13==\"team\" {print $4}' 2026_LoL_esports_match_data_from_OraclesElixir.csv)",
+      "Bash(awk -F',' 'NR>1 && $13==\"team\" {print $4}' 2025_LoL_esports_match_data_from_OraclesElixir.csv)",
+      "Bash(curl -s -I -A \"Mozilla/5.0\" \"https://oracleselixir-downloadable-match-files.s3-us-west-2.amazonaws.com/2026_LoL_esports_match_data_from_OraclesElixir.csv\")",
+      "Bash(awk -F',' 'NR>1 && $13==\"team\" && $16 ~ /Suning|Weibo/ {print $16; exit}' 2020_LoL_esports_match_data_from_OraclesElixir.csv)",
+      "Bash(awk -F',' 'NR>1 && $13==\"team\" && $16 ~ /Rogue|KOI/ {print $16; exit}' 2021_LoL_esports_match_data_from_OraclesElixir.csv)",
+      "Bash(awk -F',' 'NR>1 && $13==\"team\" && $16 ~ /MAD Lions/ {print $16; exit}' 2021_LoL_esports_match_data_from_OraclesElixir.csv)",
+      "Bash(awk -F',' 'NR>1 && $13==\"team\" && $16 ~ /Samsung|Gen\\\\.G/ {print $16; exit}' 2014_LoL_esports_match_data_from_OraclesElixir.csv)",
+      "Bash(curl -s -A \"Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36\" \"https://oracleselixir.com/tools/downloads\" -o /tmp/oe.html -w \"http:%{http_code} size:%{size_download}\\\\n\")",
+      "Bash(curl -s -A \"Mozilla/5.0\" \"https://oracleselixir.com/static/js/main.0e016b08.js\" -o /tmp/oe-main.js -w \"size:%{size_download}\\\\n\")",
+      "Bash(grep -oE '\"https?://[^\"]{10,180}\"' /tmp/oe-main.js)",
+      "Bash(curl -s -A \"Mozilla/5.0\" \"https://drive.google.com/embeddedfolderview?id=1gLSw0RLjBbtaNy0dgnGQDAZOHIgCe-HH#list\")",
+      "Bash(curl -s -A \"Mozilla/5.0\" \"https://drive.google.com/embeddedfolderview?id=1gLSw0RLjBbtaNy0dgnGQDAZOHIgCe-HH#list\" -o /tmp/oe-folder.html)",
+      "Bash(curl -s -L -A \"Mozilla/5.0\" \"https://drive.usercontent.google.com/download?id=1hnpbrUpBMS1TZI7IovfpKeZfWJH1Aptm&export=download&confirm=t\" -o /tmp/oe-2026-test.csv -w \"http:%{http_code} size:%{size_download}\\\\n\" --max-time 120)",
+      "Bash(grep -oE '\"/[a-zA-Z/{}$.:_-]{3,60}\"' /tmp/oe-main.js)",
+      "Bash(grep -oE 'concat\\\\\\(cr,\"[^\"]{3,80}\"' /tmp/oe-main.js)",
+      "Bash(curl -s -A \"Mozilla/5.0\" \"https://oe.datalisk.io/matchData\" -H \"x-api-key: f561197a-82ea-4e54-acd2-386979018a7a\")",
+      "Bash(curl -s -A \"Mozilla/5.0\" \"https://oe.datalisk.io/matchData\")"
     ]
   }
 }
