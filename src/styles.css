@@ -377,6 +377,9 @@ body {
 .hop a:hover {
   text-decoration: underline;
 }
+.hop a.games-toggle {
+  color: var(--muted);
+}
 
 .reverse-section {
   margin-top: 20px;

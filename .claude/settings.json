@@ -15,7 +15,17 @@
       "Bash(git branch *)",
       "Bash(npm run *)",
       "Bash(git rm *)",
-      "Bash(git -c core.safecrlf=false commit -q -m 'feat: Rift Pettifogger v1 —— 数据管道、规则引擎、图搜索、前端与部署工作流 *)"
+      "Bash(git -c core.safecrlf=false commit -q -m 'feat: Rift Pettifogger v1 —— 数据管道、规则引擎、图搜索、前端与部署工作流 *)",
+      "Bash(gh repo *)",
+      "Bash(gh api *)",
+      "Bash(gh workflow *)",
+      "Bash(gh run *)",
+      "Bash(npx vite *)",
+      "Bash(curl -s http://localhost:5199/rift-pettifogger/)",
+      "Bash(curl -s http://localhost:5199/rift-pettifogger/data/index.json)",
+      "Bash(curl -s -o /dev/null -w \"shell: %{http_code}\\\\n\" http://localhost:5199/rift-pettifogger/)",
+      "Bash(curl -s http://localhost:5199/rift-pettifogger/src/main.ts -o /dev/null -w \"main.ts: %{http_code}\\\\n\")",
+      "Bash(git -c core.safecrlf=false commit -q -m 'fix: 论据卡逐局展开、rule3 标题空格、抓取工作流 rebase 防冲突 *)"
     ]
   }
 }

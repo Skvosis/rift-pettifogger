@@ -7,6 +7,7 @@ import { judge } from "./engine/graph";
 import { findWinningFilters } from "./engine/mouthhard";
 import { verdictToText } from "./ui/copy";
 import { RULE_NAME, chainSummary, describeEdge, name as teamName } from "./ui/describe";
+import { gamesOfSeries } from "./games";
 
 // ---------- 小工具 ----------
 function h<K extends keyof HTMLElementTagNameMap>(
@@ -254,9 +255,26 @@ function renderArg(arg: Argument): HTMLElement {
     const hop = h("div", { class: "hop" }, [h("div", { class: "hop-title" }, [d.title])]);
     for (const detail of d.details) hop.append(h("div", { class: "hop-detail" }, [detail]));
     if (d.url) hop.append(h("a", { href: d.url, target: "_blank", rel: "noreferrer" } as any, ["查看原始出处 ↗"]));
+    if (e.evidence.kind === "rule1") appendGameExpand(hop, e.evidence.series.id, e.evidence.series.date);
     card.append(hop);
   }
   return card;
+}
+
+/** 规则 1 证据卡上的“逐局”按需展开。 */
+function appendGameExpand(hop: HTMLElement, seriesId: string, date: string) {
+  const btn = h("a", { href: "javascript:void 0", class: "games-toggle" } as any, [" · 逐局"]);
+  btn.addEventListener("click", async () => {
+    btn.remove();
+    const games = await gamesOfSeries(seriesId, date);
+    const text = games.length
+      ? games
+          .map((g) => `G${g.game_n} ${teamName(dataset.teamById, g.winner)} 胜`)
+          .join(" / ")
+      : "暂无逐局数据";
+    hop.append(h("div", { class: "hop-detail" }, [`逐局：${text}`]));
+  });
+  hop.append(btn);
 }
 
 // ---------- 嘴硬模式 ----------

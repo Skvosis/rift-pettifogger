@@ -76,7 +76,7 @@ export function describeEdge(teams: Teams, e: Edge): { title: string; details: s
   const caption = ev.tally === "game" ? "小局" : "大局";
   const scopeNote = ev.downgraded ? `（口径：${SCOPE_LABEL[ev.scopeUsed]}）` : "";
   return {
-    title: `${from} 对 ${to} 历史战绩占优 ${scopeNote}`,
+    title: `${from} 对 ${to} 历史战绩占优${scopeNote ? " " + scopeNote : ""}`,
     details: [
       `${ev.wins}-${ev.total - ev.wins}（胜率 ${rate}%，按${caption}${ev.downgraded ? "，已收窄到 " + SCOPE_LABEL[ev.scopeUsed] : ""}）`,
       ...ev.series.slice(0, 6).map((s) => "· " + describeSeries(teams, s)),
