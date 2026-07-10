@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rift Pettifogger · 赢学联盟 — LOL 战队论据生成器</title>
+    <meta
+      name="description"
+      content="输入战队 A 和 B，在真实比赛数据中搜索「A 比 B 强」的论据链，一键生成带出处的论证文本。"
+    />
+  </head>
+  <body>
+    <div id="app">
+      <header class="site-header">
+        <h1>赢学联盟 <span class="en">Rift Pettifogger</span></h1>
+        <p class="tagline">输入 A 和 B，在真实战绩里找出「A 比 B 强」的论据链——本工具是辩护律师，不是法官。</p>
+      </header>
+
+      <main>
+        <section class="panel picker-panel">
+          <div class="matchup">
+            <div class="team-field">
+              <label>战队 A</label>
+              <div class="combo" data-side="a">
+                <input class="combo-input" type="text" placeholder="搜索战队 / 别名…" autocomplete="off" />
+                <ul class="combo-list" hidden></ul>
+              </div>
+            </div>
+            <div class="vs">＞</div>
+            <div class="team-field">
+              <label>战队 B</label>
+              <div class="combo" data-side="b">
+                <input class="combo-input" type="text" placeholder="搜索战队 / 别名…" autocomplete="off" />
+                <ul class="combo-list" hidden></ul>
+              </div>
+            </div>
+          </div>
+
+          <details class="filters">
+            <summary>全局过滤器</summary>
+            <div class="filter-grid">
+              <div class="filter">
+                <label for="f-start">起始时间</label>
+                <input id="f-start" type="date" />
+              </div>
+              <div class="filter">
+                <label for="f-end">截止时间</label>
+                <input id="f-end" type="date" />
+              </div>
+              <div class="filter">
+                <label>赛事范围</label>
+                <div class="segmented" data-name="scope">
+                  <button data-val="all" class="active">全部</button>
+                  <button data-val="international">国际赛</button>
+                  <button data-val="worlds">仅 Worlds</button>
+                </div>
+              </div>
+              <div class="filter">
+                <label>统计口径</label>
+                <div class="segmented" data-name="tally">
+                  <button data-val="series" class="active">大局</button>
+                  <button data-val="game">小局</button>
+                </div>
+              </div>
+              <div class="filter">
+                <label for="f-prox">邻近窗口（天）</label>
+                <input id="f-prox" type="number" min="1" value="90" />
+              </div>
+              <div class="filter checkbox">
+                <label><input id="f-strict" type="checkbox" /> 跨赛制严格模式</label>
+              </div>
+            </div>
+          </details>
+
+          <div class="actions">
+            <button id="judge" class="btn primary">判案</button>
+            <button id="share" class="btn ghost" title="复制可复现链接">复制链接</button>
+            <button id="reset" class="btn ghost">重置</button>
+          </div>
+          <p class="data-status" id="data-status">加载数据中…</p>
+        </section>
+
+        <section id="results"></section>
+      </main>
+
+      <footer class="site-footer">
+        <p>
+          娱乐工具，论据 ≠ 真理：在同一份数据下，「A&gt;B」与「B&gt;A」可能同时成立。所有出处均可点击核验。
+        </p>
+        <p class="src">数据来源 Leaguepedia（lol.fandom.com），每日自动更新。</p>
+      </footer>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

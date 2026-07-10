@@ -1,0 +1,8 @@
+{
+  "_comment": "手工别名兜底。merge：把任意队名(或 TeamRedirects._pageName 解析后的当前队页)强制归并到目标 canonical_id，用于 Leaguepedia 分成两页、_pageName 无法覆盖的改名/收购。抓取后应抽查规范化队列表，把明显该合并而未合并的补进来。teams：覆盖展示名/赛区。",
+  "merge": {
+    "SK Telecom T1": "T1",
+    "SKT T1": "T1"
+  },
+  "teams": {}
+}

@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh auth *)",
+      "Bash(command -v gh)",
+      "Bash(curl -s \"https://lol.fandom.com/api.php?action=cargoquery&format=json&tables=MatchSchedule&fields=Team1,Team2,Team1Score,Team2Score,Winner,BestOf,DateTime_UTC,OverviewPage,Tab,IsNullified,Player1,MatchId&where=OverviewPage%3D%22LCK/2024%20Season/Spring%20Season%22&limit=2\")",
+      "Bash(gh --version)",
+      "Bash(curl -s -H \"User-Agent: rift-pettifogger-dev/0.1 \\(harukawa.miki@gmail.com\\)\" \"https://lol.fandom.com/api.php?action=cargoquery&format=json&tables=MatchSchedule&fields=Team1,Team2,Team1Score,Team2Score,Winner,BestOf,DateTime_UTC,OverviewPage,Tab,IsNullified,MatchId,FF&where=OverviewPage%3D%22LCK/2024%20Season/Spring%20Season%22&limit=2\")",
+      "Bash(npm install *)",
+      "Bash(npx tsx *)",
+      "Bash(npx vitest *)",
+      "Bash(npx tsc *)",
+      "Bash(echo \"=== typecheck exit: $? ===\")",
+      "Bash(git init *)",
+      "Bash(git branch *)",
+      "Bash(npm run *)",
+      "Bash(git rm *)",
+      "Bash(git -c core.safecrlf=false commit -q -m 'feat: Rift Pettifogger v1 —— 数据管道、规则引擎、图搜索、前端与部署工作流 *)"
+    ]
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "name": "rift-pettifogger",
+  "version": "0.1.0",
+  "description": "LOL 战队论据生成器 —— 在真实比赛数据中搜索\"A 比 B 强\"的论据链",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "scrape": "tsx scripts/scrape.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.5",
+    "vitest": "^2.1.8"
+  }
+}

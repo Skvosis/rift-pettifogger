@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.claude/
+*.local
+.DS_Store
+.vite/
+*.log
+.cache/
