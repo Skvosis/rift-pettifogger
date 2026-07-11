@@ -13,6 +13,7 @@
 - **数据**：主数据源为 [Oracle's Elixir](https://oracleselixir.com/tools/downloads) 按年 CSV（覆盖 2014 至今、所有主要联赛，每日更新）。GitHub Actions 每日只增量拉取**当年** CSV，重建当年 JSON 并提交 `public/data/*.json`；历史年份 JSON 已入库，无需重复下载。队标来自 Leaguepedia 图片 API（浏览器端按需解析）。
 - **规则引擎**：所有规则计算与图搜索都在浏览器端运行（边依赖过滤器状态，必须运行时生成）。
 - **可复现**：全部过滤器状态编码进 URL，一条链接即可复现判案结果。
+- **中英双语**：右上角切换，默认中文，选择记忆在 localStorage，切换不刷新页面。见 [src/i18n.ts](src/i18n.ts)；引擎层（`src/engine/`）只产出语言无关的结构化数据（如放宽建议、比较结论），由 UI 层（`src/ui/describe.ts`）格式化成当前语言文本。
 
 ### 规则
 

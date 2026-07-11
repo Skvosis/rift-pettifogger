@@ -1,14 +1,12 @@
 // 嘴硬模式（M5）：在离散过滤器空间中搜索能让 A>B 成立的组合，按“改动最小 + 链最强”推荐。
 import type { Series } from "../../shared/types";
-import type { CrossFormat, Filters, Scope, Tally } from "./types";
+import type { CrossFormat, Filters, FilterChange, Scope, Tally } from "./types";
 import { buildEdges, findArguments } from "./graph";
 
 export interface Suggestion {
   filters: Filters;
-  /** 相对当前过滤器改动了几个维度。 */
-  changes: number;
-  /** 改动的人类可读描述。 */
-  changeLabels: string[];
+  /** 相对当前过滤器的改动（语言无关，UI 层用 i18n 格式化）。 */
+  changes: FilterChange[];
   /** 最强论证的链强度。 */
   bestStrength: number;
   /** 找到的论证数。 */
@@ -48,7 +46,7 @@ export function findWinningFilters(
             for (const start of starts)
               combos.push({ ...base, scope, tally, proximityDays, crossFormat, maxChainLen, start });
 
-  combos.sort((x, y) => changeCount(base, x) - changeCount(base, y));
+  combos.sort((x, y) => computeChanges(base, x).length - computeChanges(base, y).length);
 
   const found: Suggestion[] = [];
   const seen = new Set<string>();
@@ -58,7 +56,8 @@ export function findWinningFilters(
     const sig = `${f.scope}|${f.tally}|${f.proximityDays}|${f.crossFormat}|${f.maxChainLen}|${f.start}`;
     if (seen.has(sig)) continue;
     seen.add(sig);
-    if (changeCount(base, f) === 0) continue; // 当前设置已在页面上判过
+    const changes = computeChanges(base, f);
+    if (!changes.length) continue; // 当前设置已在页面上判过
     evaluated++;
     const edges = buildEdges(series, f);
     // 只做存在性检查（取前 5 条），不做全量枚举
@@ -66,8 +65,7 @@ export function findWinningFilters(
     if (!args.length) continue;
     found.push({
       filters: f,
-      changes: changeCount(base, f),
-      changeLabels: changeLabels(base, f),
+      changes,
       bestStrength: Math.max(...args.map((x) => x.chainStrength)),
       count: args.length,
       shortest: Math.min(...args.map((x) => x.path.length)),
@@ -75,36 +73,22 @@ export function findWinningFilters(
   }
 
   found.sort(
-    (x, y) => x.changes - y.changes || x.shortest - y.shortest || y.bestStrength - x.bestStrength,
+    (x, y) =>
+      x.changes.length - y.changes.length || x.shortest - y.shortest || y.bestStrength - x.bestStrength,
   );
   return found.slice(0, maxSuggestions);
 }
 
-function changeCount(base: Filters, f: Filters): number {
-  return changeLabels(base, f).length;
-}
-
-const SCOPE_LABEL: Record<Scope, string> = {
-  all: "全部赛事",
-  international: "国际赛",
-  worlds: "仅 Worlds",
-};
-
-const XF_LABEL: Record<CrossFormat, string> = {
-  off: "关闭",
-  strict: "仅零封＞打满",
-  loose: "全档位",
-};
-
-function changeLabels(base: Filters, f: Filters): string[] {
-  const labels: string[] = [];
-  if (f.scope !== base.scope) labels.push(`赛事范围→${SCOPE_LABEL[f.scope]}`);
-  if (f.tally !== base.tally) labels.push(`口径→${f.tally === "game" ? "小局" : "大局"}`);
-  if (f.proximityDays !== base.proximityDays) labels.push(`邻近窗口→${f.proximityDays}天`);
-  if (f.crossFormat !== base.crossFormat) labels.push(`跨赛制→${XF_LABEL[f.crossFormat]}`);
-  if (f.maxChainLen !== base.maxChainLen) labels.push(`链长→${f.maxChainLen >= 7 ? "不限" : f.maxChainLen}`);
-  if (f.start !== base.start) labels.push(f.start ? `起始→${f.start}` : "清除起始时间");
-  return labels;
+/** 相对 base 有哪些维度发生了变化（语言无关的结构化列表）。 */
+function computeChanges(base: Filters, f: Filters): FilterChange[] {
+  const out: FilterChange[] = [];
+  if (f.scope !== base.scope) out.push({ kind: "scope", value: f.scope });
+  if (f.tally !== base.tally) out.push({ kind: "tally", value: f.tally });
+  if (f.proximityDays !== base.proximityDays) out.push({ kind: "proximity", days: f.proximityDays });
+  if (f.crossFormat !== base.crossFormat) out.push({ kind: "crossFormat", value: f.crossFormat });
+  if (f.maxChainLen !== base.maxChainLen) out.push({ kind: "maxChainLen", value: f.maxChainLen });
+  if (f.start !== base.start) out.push({ kind: "start", value: f.start });
+  return out;
 }
 
 function uniq<T>(arr: T[]): T[] {

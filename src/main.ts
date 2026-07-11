@@ -2,15 +2,24 @@ import "./styles.css";
 import { loadDataset, type Dataset } from "./data";
 import { resolveLogos } from "./logos";
 import type { Team } from "../shared/types";
-import type { Argument, Filters, Scope, Tally, Verdict } from "./engine/types";
+import type { Argument, Edge, Filters, Scope, SeriesEvidence, Tally, Verdict } from "./engine/types";
 import { defaultFilters, encodeState, decodeState, resolvedEnd } from "./engine/filters";
 import { judge } from "./engine/graph";
 import { findWinningFilters } from "./engine/mouthhard";
 import { verdictToText } from "./ui/copy";
-import { RULE_NAME, leagueLabel, name as teamName, stageLabel } from "./ui/describe";
-import type { SeriesEvidence } from "./engine/types";
-import type { Edge } from "./engine/types";
+import {
+  argKind,
+  formatFilterChange,
+  formatHint,
+  formatRule2Note,
+  leagueLabel,
+  name as teamName,
+  ruleName,
+  scopeLabel,
+  stageLabel,
+} from "./ui/describe";
 import { gamesOfSeries } from "./games";
+import { getLocale, onLocaleChange, setLocale, t, tc, type Locale } from "./i18n";
 
 // ---------- 小工具 ----------
 function h<K extends keyof HTMLElementTagNameMap>(
@@ -26,6 +35,8 @@ function h<K extends keyof HTMLElementTagNameMap>(
   return el;
 }
 const $ = <T extends Element>(sel: string, root: ParentNode = document): T => root.querySelector(sel) as T;
+/** 中/英文列表连接符（曾用名、嘴硬改动项等枚举文本）。 */
+const listJoiner = () => (getLocale() === "en" ? ", " : "、");
 
 // ---------- 状态 ----------
 let dataset: Dataset;
@@ -34,6 +45,9 @@ let regionGroups: { region: string; label: string; teams: Team[]; inactive: bool
 let inactiveTeams = new Set<string>();
 const selected: { a: string | null; b: string | null } = { a: null, b: null };
 let lastVerdict: Verdict | null = null;
+let lastFilters: Filters | null = null;
+let datasetSummary: { series: number; teams: number; y0: number; y1: number } | null = null;
+let loadError: string | null = null;
 
 /** 默认判案：滔博 > T1。 */
 const DEFAULT_A = "Top Esports";
@@ -43,26 +57,31 @@ const DEFAULT_B = "T1";
 init();
 
 async function init() {
+  applyStaticTranslations();
+  setupLangSwitch();
+  updateDataStatus();
   try {
     dataset = await loadDataset();
   } catch (e) {
-    $("#data-status").textContent = "数据加载失败：" + String(e);
+    loadError = String(e);
+    updateDataStatus();
     return;
   }
   // 活跃度：最近一场比赛在 365 天内
   const lastPlayed = new Map<string, number>();
   for (const s of dataset.series) {
-    const t = Date.parse(s.date);
-    if ((lastPlayed.get(s.t1) ?? 0) < t) lastPlayed.set(s.t1, t);
-    if ((lastPlayed.get(s.t2) ?? 0) < t) lastPlayed.set(s.t2, t);
+    const ts = Date.parse(s.date);
+    if ((lastPlayed.get(s.t1) ?? 0) < ts) lastPlayed.set(s.t1, ts);
+    if ((lastPlayed.get(s.t2) ?? 0) < ts) lastPlayed.set(s.t2, ts);
   }
   const activeCutoff = Date.now() - 365 * 24 * 3.6e6;
   inactiveTeams = new Set(
-    dataset.teams.filter((t) => (lastPlayed.get(t.canonical_id) ?? 0) < activeCutoff).map((t) => t.canonical_id),
+    dataset.teams.filter((tm) => (lastPlayed.get(tm.canonical_id) ?? 0) < activeCutoff).map((tm) => tm.canonical_id),
   );
   regionGroups = groupByRegion(dataset.teams);
   const { years, counts } = dataset.index;
-  $("#data-status").textContent = `已载入 ${counts.series.toLocaleString()} 场对阵、${counts.teams} 支战队（${years[0]}–${years[years.length - 1]}）。`;
+  datasetSummary = { series: counts.series, teams: counts.teams, y0: years[0], y1: years[years.length - 1] };
+  updateDataStatus();
 
   setupCombo("a");
   setupCombo("b");
@@ -74,43 +93,101 @@ async function init() {
   restoreFromUrl();
 }
 
+// ---------- i18n 应用 ----------
+function applyStaticTranslations() {
+  document.documentElement.lang = getLocale() === "zh" ? "zh-CN" : "en";
+  document.title = t("meta.title");
+  document.querySelector('meta[name="description"]')?.setAttribute("content", t("meta.description"));
+  document.querySelectorAll<HTMLElement>("[data-i18n]").forEach((el) => {
+    el.textContent = t(el.dataset.i18n!);
+  });
+  document.querySelectorAll<HTMLElement>("[data-i18n-html]").forEach((el) => {
+    el.innerHTML = t(el.dataset.i18nHtml!);
+  });
+  document.querySelectorAll<HTMLInputElement>("[data-i18n-placeholder]").forEach((el) => {
+    el.placeholder = t(el.dataset.i18nPlaceholder!);
+  });
+  document.querySelectorAll<HTMLElement>("[data-i18n-title]").forEach((el) => {
+    el.title = t(el.dataset.i18nTitle!);
+  });
+  document.querySelectorAll<HTMLButtonElement>(".lang-btn").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.lang === getLocale());
+  });
+}
+
+function setupLangSwitch() {
+  document.querySelectorAll<HTMLButtonElement>(".lang-btn").forEach((btn) => {
+    btn.addEventListener("click", () => setLocale(btn.dataset.lang as Locale));
+  });
+  onLocaleChange(() => {
+    applyStaticTranslations();
+    onLocaleUpdated();
+  });
+}
+
+/** 语言切换后需要重新生成的动态内容（静态 data-i18n 元素已由 applyStaticTranslations 处理）。 */
+function onLocaleUpdated() {
+  updateDataStatus();
+  if (!dataset) return; // 数据尚未加载完成
+  regionGroups = groupByRegion(dataset.teams);
+  // 打开中的选择面板内容按旧语言渲染，直接关闭；下次打开会用新语言重建
+  document.querySelectorAll<HTMLElement>(".combo-panel").forEach((p) => (p.hidden = true));
+  setTrigger("a", selected.a ? dataset.teamById.get(selected.a) ?? null : null);
+  setTrigger("b", selected.b ? dataset.teamById.get(selected.b) ?? null : null);
+  if (lastVerdict && lastFilters) renderVerdict(lastVerdict, lastFilters);
+}
+
+function updateDataStatus() {
+  const el = $<HTMLElement>("#data-status");
+  if (loadError) {
+    el.textContent = t("status.loadFailed", { error: loadError });
+    return;
+  }
+  if (!datasetSummary) {
+    el.textContent = t("status.loading");
+    return;
+  }
+  const { series, teams, y0, y1 } = datasetSummary;
+  el.textContent = t("status.loaded", { series: series.toLocaleString(), teams, y0, y1 });
+}
+
 // ---------- 战队选择器（两级：赛区 → 战队） ----------
 
-/** 赛区排序与中文标签。 */
-const REGION_META: { match: string[]; label: string }[] = [
-  { match: ["China"], label: "LPL 中国" },
-  { match: ["Korea"], label: "LCK 韩国" },
-  { match: ["EMEA", "Europe"], label: "LEC 欧洲" },
-  { match: ["North America", "Americas"], label: "LCS/LTA 美洲" },
-  { match: ["Vietnam"], label: "VCS 越南" },
-  { match: ["Asia-Pacific", "PCS"], label: "PCS 亚太" },
-  { match: ["Brazil"], label: "CBLOL 巴西" },
-  { match: ["Latin America", "Latin America North", "Latin America South"], label: "LLA 拉美" },
-  { match: ["Japan"], label: "LJL 日本" },
-  { match: ["Oceania"], label: "LCO 大洋洲" },
-  { match: ["Turkey", "Türkiye (Turkey)"], label: "TCL 土耳其" },
-  { match: ["Taiwan"], label: "LMS 台湾" },
-  { match: ["Southeast Asia"], label: "GPL 东南亚" },
-  { match: ["CIS"], label: "LCL 独联体" },
+/** 赛区排序与展示 key（label 通过 i18n 查表）。 */
+const REGION_META: { match: string[]; key: string }[] = [
+  { match: ["China"], key: "LPL" },
+  { match: ["Korea"], key: "LCK" },
+  { match: ["EMEA", "Europe"], key: "LEC" },
+  { match: ["North America", "Americas"], key: "LCS_LTA" },
+  { match: ["Vietnam"], key: "VCS" },
+  { match: ["Asia-Pacific", "PCS"], key: "PCS" },
+  { match: ["Brazil"], key: "CBLOL" },
+  { match: ["Latin America", "Latin America North", "Latin America South"], key: "LLA" },
+  { match: ["Japan"], key: "LJL" },
+  { match: ["Oceania"], key: "LCO" },
+  { match: ["Turkey", "Türkiye (Turkey)"], key: "TCL" },
+  { match: ["Taiwan"], key: "LMS" },
+  { match: ["Southeast Asia"], key: "GPL" },
+  { match: ["CIS"], key: "LCL" },
 ];
 
 function regionLabel(region: string): { label: string; order: number } {
   for (let i = 0; i < REGION_META.length; i++) {
-    if (REGION_META[i].match.includes(region)) return { label: REGION_META[i].label, order: i };
+    if (REGION_META[i].match.includes(region)) return { label: t(`region.${REGION_META[i].key}`), order: i };
   }
-  return { label: region || "其他", order: REGION_META.length + (region ? 0 : 1) };
+  return { label: region || t("region.other"), order: REGION_META.length + (region ? 0 : 1) };
 }
 
 function groupByRegion(
   teams: Team[],
 ): { region: string; label: string; teams: Team[]; inactive: boolean }[] {
   const map = new Map<string, Team[]>();
-  for (const t of teams) {
-    const key = t.region || "";
+  for (const team of teams) {
+    const key = team.region || "";
     if (!map.has(key)) map.set(key, []);
-    map.get(key)!.push(t);
+    map.get(key)!.push(team);
   }
-  const isInactive = (t: Team) => inactiveTeams.has(t.canonical_id);
+  const isInactive = (team: Team) => inactiveTeams.has(team.canonical_id);
   return [...map.entries()]
     .map(([region, list]) => ({
       region,
@@ -131,10 +208,10 @@ function groupByRegion(
 }
 
 /** 曾用名列表（去重、剔除与显示名相同者，最多 3 个）。 */
-function formerNames(t: Team): string[] {
-  const seen = new Set<string>([t.display_name.toLowerCase()]);
+function formerNames(team: Team): string[] {
+  const seen = new Set<string>([team.display_name.toLowerCase()]);
   const out: string[] = [];
-  for (const a of t.aliases) {
+  for (const a of team.aliases) {
     const k = a.toLowerCase();
     if (seen.has(k)) continue;
     seen.add(k);
@@ -144,18 +221,20 @@ function formerNames(t: Team): string[] {
   return out;
 }
 
-function teamRow(t: Team, onPick: (t: Team) => void): HTMLElement {
-  const former = formerNames(t);
-  const inactive = inactiveTeams.has(t.canonical_id);
+function teamRow(team: Team, onPick: (team: Team) => void): HTMLElement {
+  const former = formerNames(team);
+  const inactive = inactiveTeams.has(team.canonical_id);
   const li = h("li", { class: "team-row" + (inactive ? " inactive" : "") } as any, [
-    logoEl(t.canonical_id, t.display_name),
+    logoEl(team.canonical_id, team.display_name),
     h("span", { class: "team-name" }, [
-      t.display_name,
-      ...(inactive ? [h("span", { class: "former" }, ["（已不活跃）"])] : []),
-      ...(former.length ? [h("span", { class: "former" }, [`（曾用名 ${former.join("、")}）`])] : []),
+      team.display_name,
+      ...(inactive ? [h("span", { class: "former" }, [t("picker.inactive")])] : []),
+      ...(former.length
+        ? [h("span", { class: "former" }, [t("picker.formerNames", { names: former.join(listJoiner()) })])]
+        : []),
     ]),
   ]);
-  li.addEventListener("click", () => onPick(t));
+  li.addEventListener("click", () => onPick(team));
   return li;
 }
 
@@ -206,7 +285,7 @@ function setTrigger(side: "a" | "b", team: Team | null) {
     trigger.replaceChildren(logoEl(team.canonical_id, team.display_name), h("span", {}, [team.display_name]));
     root.classList.add("selected");
   } else {
-    trigger.replaceChildren(h("span", { class: "placeholder" }, ["选择战队…"]));
+    trigger.replaceChildren(h("span", { class: "placeholder" }, [t("picker.selectTeam")]));
     root.classList.remove("selected");
   }
 }
@@ -220,9 +299,9 @@ function setupCombo(side: "a" | "b") {
   const teamList = $<HTMLUListElement>(".team-list", root);
   let activeRegion = 0;
 
-  const pick = (t: Team) => {
-    selected[side] = t.canonical_id;
-    setTrigger(side, t);
+  const pick = (team: Team) => {
+    selected[side] = team.canonical_id;
+    setTrigger(side, team);
     close();
   };
 
@@ -254,18 +333,20 @@ function setupCombo(side: "a" | "b") {
       // 过滤模式：跨赛区全量筛（支持曾用名）
       const matched: Team[] = [];
       for (const g of regionGroups) {
-        for (const t of g.teams) {
-          const hay = [t.display_name, t.canonical_id, ...t.aliases].join(" ").toLowerCase();
-          if (hay.includes(q)) matched.push(t);
+        for (const team of g.teams) {
+          const hay = [team.display_name, team.canonical_id, ...team.aliases].join(" ").toLowerCase();
+          if (hay.includes(q)) matched.push(team);
           if (matched.length >= 40) break;
         }
       }
       teamList.replaceChildren(
-        ...(matched.length ? matched.map((t) => teamRow(t, pick)) : [h("li", { class: "none" }, ["无匹配战队"])]),
+        ...(matched.length
+          ? matched.map((team) => teamRow(team, pick))
+          : [h("li", { class: "none" }, [t("picker.noMatch")])]),
       );
     } else {
       const g = regionGroups[activeRegion];
-      teamList.replaceChildren(...(g ? g.teams.map((t) => teamRow(t, pick)) : []));
+      teamList.replaceChildren(...(g ? g.teams.map((team) => teamRow(team, pick)) : []));
     }
   };
 
@@ -352,11 +433,12 @@ function setSeg(nameAttr: string, val: string) {
 
 // ---------- 判案 ----------
 function onJudge() {
-  if (!selected.a || !selected.b) return toast("请先选择两支战队");
-  if (selected.a === selected.b) return toast("A、B 不能是同一支战队");
+  if (!selected.a || !selected.b) return toast(t("toast.selectBoth"));
+  if (selected.a === selected.b) return toast(t("toast.sameTeam"));
   const filters = readFilters();
   const filtered = filterByEnd(filters);
   lastVerdict = judge(dataset.series, selected.a, selected.b, filtered);
+  lastFilters = filtered;
   renderVerdict(lastVerdict, filtered);
   updateUrl(filters);
 }
@@ -375,10 +457,12 @@ function renderVerdict(v: Verdict, filters: Filters) {
 
   // 正方
   const head = h("div", { class: "verdict-head" }, [
-    h("h2", {}, [spanCls("a", a), document.createTextNode(" 强于 "), spanCls("b", b)]),
-    h("span", { class: "count-pill" }, [`${v.forward.length} 条论据`]),
+    h("h2", {}, [spanCls("a", a), document.createTextNode(t("verdict.strongerThan")), spanCls("b", b)]),
+    h("span", { class: "count-pill" }, [tc("verdict.countPill", v.forward.length)]),
   ]);
-  const copyBtn = h("button", { class: "btn ghost small", onclick: () => onCopy(filters) } as any, ["一键复制论据"]);
+  const copyBtn = h("button", { class: "btn ghost small", onclick: () => onCopy(filters) } as any, [
+    t("verdict.copyButton"),
+  ]);
   head.append(copyBtn);
   root.append(head);
 
@@ -387,9 +471,9 @@ function renderVerdict(v: Verdict, filters: Filters) {
   } else {
     root.append(
       h("div", { class: "empty" }, [
-        h("strong", {}, [`暂时找不到「${a} > ${b}」的论据链。`]),
+        h("strong", {}, [t("verdict.emptyHeadline", { a, b })]),
         h("br"),
-        document.createTextNode(v.hint ?? ""),
+        document.createTextNode(v.hint ? formatHint(v.hint) : ""),
       ]),
     );
     root.append(renderMouthHard(v, filters));
@@ -398,9 +482,7 @@ function renderVerdict(v: Verdict, filters: Filters) {
   // 反方
   if (v.reverse.length) {
     const details = h("details", { class: "reverse-section reverse" });
-    details.append(
-      h("summary", {}, [`对方可能这样反驳你：${b} 强于 ${a}（${v.reverse.length} 条）`]),
-    );
+    details.append(h("summary", {}, [tc("verdict.reverseSummary", v.reverse.length, { a, b })]));
     details.append(renderArgList(v.reverse, "reverse"));
     root.append(details);
   }
@@ -419,7 +501,7 @@ function renderArgList(args: Argument[], variant: "forward" | "reverse"): HTMLEl
   for (const arg of initial) wrap.append(renderArg(arg));
   if (args.length > limit) {
     const rest = args.slice(limit);
-    const btn = h("button", { class: "more-btn" }, [`展开其余 ${rest.length} 条论据`]);
+    const btn = h("button", { class: "more-btn" }, [tc("verdict.moreButton", rest.length)]);
     btn.addEventListener("click", () => {
       for (const arg of rest) wrap.insertBefore(renderArg(arg), btn);
       btn.remove();
@@ -431,14 +513,11 @@ function renderArgList(args: Argument[], variant: "forward" | "reverse"): HTMLEl
 
 function renderArg(arg: Argument): HTMLElement {
   const card = h("div", { class: "arg-card" });
-  const kind = arg.path.length === 1 ? RULE_NAME[arg.path[0].rule] : `传递链 · ${arg.path.length} 环`;
   const score = (arg.chainStrength * 100).toFixed(0);
   card.append(
     h("div", { class: "arg-head" }, [
-      h("span", { class: "arg-kind" }, [kind]),
-      h("span", { class: "arg-score", title: "综合规则可信度、赛事级别、阶段、赛制与新旧的含金量评分" }, [
-        `含金量 ${score}`,
-      ]),
+      h("span", { class: "arg-kind" }, [argKind(arg.path)]),
+      h("span", { class: "arg-score", title: t("arg.scoreTooltip") }, [t("arg.score", { score })]),
     ]),
   );
   const chain = h("div", { class: "chain-row" });
@@ -477,8 +556,12 @@ function matchLine(ev: SeriesEvidence): HTMLElement {
   if (st) meta.append(h("span", { class: "badge stage" + (ev.stage === "final" ? " final" : "") }, [st]));
   meta.append(h("span", { class: "badge bo" }, [`Bo${ev.best_of}`]));
   meta.append(h("span", { class: "date" }, [ev.date.slice(0, 10)]));
-  if (ev.flags.includes("ff")) meta.append(h("span", { class: "badge warn" }, ["含弃权"]));
-  const src = h("a", { href: ev.url, target: "_blank", rel: "noreferrer", title: "查看出处" } as any, ["出处↗"]);
+  if (ev.flags.includes("ff")) meta.append(h("span", { class: "badge warn" }, [t("flag.ff")]));
+  const src = h(
+    "a",
+    { href: ev.url, target: "_blank", rel: "noreferrer", title: t("link.sourceTitle") } as any,
+    [t("link.source")],
+  );
   src.className = "src-link";
   meta.append(src);
   appendGameExpand(meta, ev.id, ev.date);
@@ -495,19 +578,24 @@ function renderLinkBox(e: Edge): HTMLElement {
   } else if (e.evidence.kind === "rule2") {
     matches.append(matchLine(e.evidence.aSeries));
     matches.append(matchLine(e.evidence.bSeries));
-    matches.append(h("div", { class: "link-note" }, [e.evidence.note]));
+    matches.append(h("div", { class: "link-note" }, [formatRule2Note(e.evidence.note)]));
   } else {
     const ev = e.evidence;
-    const caption = ev.tally === "game" ? "小局" : "大局";
-    const scopeNote = ev.downgraded ? `（口径已收窄：${scopeText(ev.scopeUsed)}）` : "";
+    const tally = t(`tally.${ev.tally}`);
+    const scopeNote = ev.downgraded ? t("link.rule3ScopeNote", { scope: scopeLabel(ev.scopeUsed) }) : "";
     matches.append(
       h("div", { class: "link-note strong" }, [
-        `历史战绩 ${ev.wins}-${ev.total - ev.wins}（按${caption}，胜率 ${(ev.rate * 100).toFixed(0)}%）${scopeNote}`,
+        t("link.rule3Summary", {
+          wins: ev.wins,
+          losses: ev.total - ev.wins,
+          tally,
+          rate: (ev.rate * 100).toFixed(0),
+        }) + scopeNote,
       ]),
     );
     for (const s of ev.series.slice(0, 3)) matches.append(matchLine(s));
     if (ev.series.length > 3) {
-      matches.append(h("div", { class: "link-note" }, [`…共 ${ev.series.length} 场交手`]));
+      matches.append(h("div", { class: "link-note" }, [tc("link.moreMatches", ev.series.length)]));
     }
   }
   box.append(matches);
@@ -516,24 +604,20 @@ function renderLinkBox(e: Edge): HTMLElement {
       teamChip(e.from),
       h("span", { class: "gt" }, ["＞"]),
       teamChip(e.to, { dim: true }),
-      h("span", { class: "verdict-rule" }, [RULE_NAME[e.rule]]),
+      h("span", { class: "verdict-rule" }, [ruleName(e.rule)]),
     ]),
   );
   return box;
 }
 
-function scopeText(s: string): string {
-  return s === "worlds" ? "仅 Worlds" : s === "international" ? "国际赛" : "全部";
-}
-
 /** 比分行上的“逐局”按需展开。 */
 function appendGameExpand(meta: HTMLElement, seriesId: string, date: string) {
-  const btn = h("a", { href: "javascript:void 0", class: "games-toggle" } as any, ["逐局"]);
+  const btn = h("a", { href: "javascript:void 0", class: "games-toggle" } as any, [t("link.games")]);
   btn.addEventListener("click", async () => {
     const games = await gamesOfSeries(seriesId, date);
     const text = games.length
       ? games.map((g) => `G${g.game_n} ${teamName(dataset.teamById, g.winner)}`).join(" / ")
-      : "暂无逐局数据";
+      : t("link.noGames");
     btn.replaceWith(h("span", { class: "games-detail" }, [text]));
   });
   meta.append(btn);
@@ -542,29 +626,32 @@ function appendGameExpand(meta: HTMLElement, seriesId: string, date: string) {
 // ---------- 嘴硬模式 ----------
 function renderMouthHard(v: Verdict, base: Filters): HTMLElement {
   const box = h("div", { class: "mouthhard" });
-  box.append(h("h3", {}, ["嘴硬模式"]));
-  box.append(h("p", { class: "sub" }, ["当前设置洗不动？让我自动找出能让你赢的过滤器组合。"]));
-  const btn = h("button", { class: "btn primary small" }, ["帮我找赢面"]);
+  box.append(h("h3", {}, [t("mouthhard.title")]));
+  box.append(h("p", { class: "sub" }, [t("mouthhard.sub")]));
+  const btn = h("button", { class: "btn primary small" }, [t("mouthhard.button")]);
   box.append(btn);
   const out = h("div", {});
   box.append(out);
   btn.addEventListener("click", () => {
     btn.disabled = true;
-    btn.textContent = "搜索中…";
+    btn.textContent = t("mouthhard.searching");
     setTimeout(() => {
       const sugs = findWinningFilters(dataset.series, v.a, v.b, base, 6);
       btn.remove();
       if (!sugs.length) {
-        out.append(h("p", { class: "sub" }, ["穷尽所有过滤器组合仍找不到赢面——这盘是真的没法洗。"]));
+        out.append(h("p", { class: "sub" }, [t("mouthhard.exhausted")]));
         return;
       }
       for (const s of sugs) {
+        const labels = s.changes.map(formatFilterChange).join(listJoiner()) || t("mouthhard.adjustFallback");
         const row = h("div", { class: "suggestion" }, [
           h("div", { class: "labels" }, [
-            document.createTextNode(s.changeLabels.join("，") || "调整过滤器"),
-            h("div", { class: "meta" }, [`${s.count >= 5 ? "5+" : s.count} 条论据 · 最短 ${s.shortest} 跳`]),
+            document.createTextNode(labels),
+            h("div", { class: "meta" }, [
+              tc("mouthhard.meta", s.count >= 5 ? "5+" : s.count, { shortest: s.shortest }),
+            ]),
           ]),
-          h("button", { class: "btn ghost small" }, ["套用并判案"]),
+          h("button", { class: "btn ghost small" }, [t("mouthhard.apply")]),
         ]);
         $<HTMLButtonElement>("button", row).addEventListener("click", () => {
           writeFilters(s.filters);
@@ -586,7 +673,7 @@ async function onCopy(filters: Filters) {
     includeReverse: true,
   });
   await copyText(text);
-  toast("论据已复制到剪贴板");
+  toast(t("toast.copied"));
 }
 
 async function onShare() {
@@ -594,12 +681,13 @@ async function onShare() {
   const url = location.origin + location.pathname + "?" + encodeState(selected.a, selected.b, filters);
   await copyText(url);
   updateUrl(filters);
-  toast("可复现链接已复制");
+  toast(t("toast.linkCopied"));
 }
 
 function onReset() {
   selected.a = selected.b = null;
   lastVerdict = null;
+  lastFilters = null;
   setTrigger("a", null);
   setTrigger("b", null);
   writeFilters(defaultFilters());

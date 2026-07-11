@@ -1,6 +1,6 @@
 // 图搜索：用规则 1–3 产的边建有向图，枚举 A→B 简单路径（规则 4），含反方视角与放宽建议。
 import type { Series } from "../../shared/types";
-import type { Argument, Edge, Filters, Verdict } from "./types";
+import type { Argument, Edge, Filters, Hint, TipKey, Verdict } from "./types";
 import { rule1, rule2All, rule3 } from "./rules";
 import { QUALITY, inTimeWindow } from "./types";
 
@@ -138,22 +138,20 @@ function chainScore(path: Edge[]): number {
   return minQ * Math.pow(QUALITY.chainDecay, path.length - 1);
 }
 
-/** 正方无路径时，给出最可能有戏的放宽建议。 */
-function suggestRelaxation(all: Series[], a: string, b: string, f: Filters): string {
+/** 正方无路径时，给出最可能有戏的放宽建议（结构化，UI 层用 i18n 格式化）。 */
+function suggestRelaxation(all: Series[], a: string, b: string, f: Filters): Hint {
   const anyA = all.some((s) => s.t1 === a || s.t2 === a);
   const anyB = all.some((s) => s.t1 === b || s.t2 === b);
-  if (!anyA || !anyB) {
-    return "数据中缺少其中一支战队的比赛记录，请确认选择或等待数据更新。";
-  }
-  const tips: string[] = [];
-  if (f.start) tips.push("清除“起始时间”以纳入更早的交手（默认只看最近三个月）");
-  if (f.maxChainLen < MAX_DEPTH) tips.push("放宽“链长上限”");
-  if (f.scope !== "all") tips.push("把“赛事范围”放宽到全部");
-  if (f.crossFormat !== "loose") tips.push("把“跨赛制对比”放宽到全档位");
-  if (f.proximityDays < 180) tips.push("调大“邻近窗口”让共同对手更易匹配");
-  if (f.tally === "series") tips.push("切换到“小局”口径");
-  if (!tips.length) return "当前过滤器下找不到任何论据链——已是最宽松设置，这盘确实不好洗。";
-  return "找不到论据链。可尝试：" + tips.join("；") + "。";
+  if (!anyA || !anyB) return { kind: "missingData" };
+  const tips: TipKey[] = [];
+  if (f.start) tips.push("clearStart");
+  if (f.maxChainLen < MAX_DEPTH) tips.push("widenChainLen");
+  if (f.scope !== "all") tips.push("widenScope");
+  if (f.crossFormat !== "loose") tips.push("widenCrossFormat");
+  if (f.proximityDays < 180) tips.push("widenProximity");
+  if (f.tally === "series") tips.push("switchTally");
+  if (!tips.length) return { kind: "exhausted" };
+  return { kind: "noPath", tips };
 }
 
 function push<K, V>(m: Map<K, V[]>, k: K, v: V) {

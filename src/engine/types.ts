@@ -45,6 +45,12 @@ export interface SeriesEvidence {
   url: string;
 }
 
+/** 规则 2 比较结论的结构化说明（语言无关，UI 层用 i18n 格式化成文本）。 */
+export type Rule2Note =
+  | { kind: "sameWinFewerLosses" }
+  | { kind: "sameLossMoreWins" }
+  | { kind: "crossFormatTier"; higher: number; lower: number };
+
 export type Evidence =
   | { kind: "rule1"; series: SeriesEvidence }
   | {
@@ -53,8 +59,8 @@ export type Evidence =
       aSeries: SeriesEvidence; // from 队 vs C
       bSeries: SeriesEvidence; // to 队 vs C
       sameFormat: boolean;
-      /** 人类可读的比较说明。 */
-      note: string;
+      /** 比较结论（结构化，供 UI 格式化）。 */
+      note: Rule2Note;
     }
   | {
       kind: "rule3";
@@ -87,6 +93,18 @@ export interface Argument {
   chainStrength: number;
 }
 
+/** 放宽建议里单个可尝试的方向（语言无关）。 */
+export type TipKey =
+  | "clearStart"
+  | "widenChainLen"
+  | "widenScope"
+  | "widenCrossFormat"
+  | "widenProximity"
+  | "switchTally";
+
+/** 正方无路径时的放宽建议（结构化，供 UI 格式化）。 */
+export type Hint = { kind: "missingData" } | { kind: "exhausted" } | { kind: "noPath"; tips: TipKey[] };
+
 /** 判案结果。 */
 export interface Verdict {
   a: string;
@@ -96,8 +114,17 @@ export interface Verdict {
   /** 反方 B>A 的论证（已排序）。 */
   reverse: Argument[];
   /** 正方无路径时的放宽建议。 */
-  hint?: string;
+  hint?: Hint;
 }
+
+/** 嘴硬模式：单个过滤器维度的改动（语言无关）。 */
+export type FilterChange =
+  | { kind: "scope"; value: Scope }
+  | { kind: "tally"; value: Tally }
+  | { kind: "proximity"; days: number }
+  | { kind: "crossFormat"; value: CrossFormat }
+  | { kind: "maxChainLen"; value: number }
+  | { kind: "start"; value: string | null };
 
 // ---------- 含金量（论据排序权重，可按需调整） ----------
 

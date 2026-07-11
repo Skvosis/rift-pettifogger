@@ -1,6 +1,6 @@
 // 规则引擎 —— 规则 1/2/3 均为纯函数，产出有向边（from 比 to 强）。
 import type { Series } from "../../shared/types";
-import type { Edge, Filters, SeriesEvidence, Tally } from "./types";
+import type { Edge, Filters, Rule2Note, SeriesEvidence, Tally } from "./types";
 import {
   QUALITY,
   inScope,
@@ -186,7 +186,7 @@ export function rule3(all: Series[], a: string, b: string, f: Filters): Edge | n
 function sameFormatWinner(
   aEv: SeriesEvidence,
   bEv: SeriesEvidence,
-): { winner: "a" | "b"; note: string } | null {
+): { winner: "a" | "b"; note: Rule2Note } | null {
   const aWon = aEv.selfScore > aEv.oppScore;
   const bWon = bEv.selfScore > bEv.oppScore;
   if (aWon !== bWon) return null; // 一胜一负，不属规则 2
@@ -194,12 +194,12 @@ function sameFormatWinner(
     // 同胜：丢局少者强
     if (aEv.oppScore === bEv.oppScore) return null;
     const winner = aEv.oppScore < bEv.oppScore ? "a" : "b";
-    return { winner, note: "同样击败共同对手，丢局更少" };
+    return { winner, note: { kind: "sameWinFewerLosses" } };
   }
   // 同负：拿局多者强
   if (aEv.selfScore === bEv.selfScore) return null;
   const winner = aEv.selfScore > bEv.selfScore ? "a" : "b";
-  return { winner, note: "同样负于共同对手，拿下更多局" };
+  return { winner, note: { kind: "sameLossMoreWins" } };
 }
 
 /** 跨赛制：按档位比较。off 不产边；strict 要求档位差 = 2（仅零封＞打满）；loose 档位不同即可。 */
@@ -207,7 +207,7 @@ function crossFormatWinner(
   aEv: SeriesEvidence,
   bEv: SeriesEvidence,
   mode: "off" | "strict" | "loose",
-): { winner: "a" | "b"; note: string } | null {
+): { winner: "a" | "b"; note: Rule2Note } | null {
   if (mode === "off") return null;
   const aWon = aEv.selfScore > aEv.oppScore;
   const bWon = bEv.selfScore > bEv.oppScore;
@@ -217,7 +217,10 @@ function crossFormatWinner(
   if (ta === tb) return null;
   if (mode === "strict" && Math.abs(ta - tb) !== 2) return null;
   const winner = ta > tb ? "a" : "b";
-  return { winner, note: `跨赛制对比对手表现更强（档位 ${Math.max(ta, tb)} vs ${Math.min(ta, tb)}）` };
+  return {
+    winner,
+    note: { kind: "crossFormatTier", higher: Math.max(ta, tb), lower: Math.min(ta, tb) },
+  };
 }
 
 /** 两场 series 是否满足邻近窗口（同赛事自动满足）。 */

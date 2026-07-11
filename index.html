@@ -12,8 +12,12 @@
   <body>
     <div id="app">
       <header class="site-header">
-        <h1>赢学联盟 <span class="en">Rift Pettifogger</span></h1>
-        <p class="tagline">
+        <div class="lang-switch" role="group" aria-label="Language / 语言">
+          <button type="button" class="lang-btn" data-lang="zh" aria-label="中文">中</button>
+          <button type="button" class="lang-btn" data-lang="en" aria-label="English">EN</button>
+        </div>
+        <h1><span data-i18n="app.title">赢学联盟</span> <span class="en">Rift Pettifogger</span></h1>
+        <p class="tagline" data-i18n-html="tagline">
           你是一个云观众，你甚至记不清有哪些比赛……<br />
           但你真的很爱哥哥，今天却有人说滔博不如T1……<br />
           来吧，寻找哥哥更强的证据！
@@ -24,11 +28,19 @@
         <section class="panel picker-panel">
           <div class="matchup">
             <div class="team-field">
-              <label>战队 A</label>
+              <label data-i18n="picker.teamA">战队 A</label>
               <div class="combo" data-side="a">
-                <button type="button" class="combo-trigger"><span class="placeholder">选择战队…</span></button>
+                <button type="button" class="combo-trigger">
+                  <span class="placeholder" data-i18n="picker.selectTeam">选择战队…</span>
+                </button>
                 <div class="combo-panel" hidden>
-                  <input class="combo-filter" type="text" placeholder="筛选（可输入曾用名）…" autocomplete="off" />
+                  <input
+                    class="combo-filter"
+                    type="text"
+                    data-i18n-placeholder="picker.filterPlaceholder"
+                    placeholder="筛选（可输入曾用名）…"
+                    autocomplete="off"
+                  />
                   <div class="combo-panes">
                     <ul class="region-list"></ul>
                     <ul class="team-list"></ul>
@@ -38,11 +50,19 @@
             </div>
             <div class="vs">＞</div>
             <div class="team-field">
-              <label>战队 B</label>
+              <label data-i18n="picker.teamB">战队 B</label>
               <div class="combo" data-side="b">
-                <button type="button" class="combo-trigger"><span class="placeholder">选择战队…</span></button>
+                <button type="button" class="combo-trigger">
+                  <span class="placeholder" data-i18n="picker.selectTeam">选择战队…</span>
+                </button>
                 <div class="combo-panel" hidden>
-                  <input class="combo-filter" type="text" placeholder="筛选（可输入曾用名）…" autocomplete="off" />
+                  <input
+                    class="combo-filter"
+                    type="text"
+                    data-i18n-placeholder="picker.filterPlaceholder"
+                    placeholder="筛选（可输入曾用名）…"
+                    autocomplete="off"
+                  />
                   <div class="combo-panes">
                     <ul class="region-list"></ul>
                     <ul class="team-list"></ul>
@@ -53,59 +73,59 @@
           </div>
 
           <details class="filters">
-            <summary>全局过滤器</summary>
+            <summary data-i18n="filter.title">全局过滤器</summary>
             <div class="filter-grid">
               <div class="filter">
-                <label for="f-start">起始时间</label>
+                <label for="f-start" data-i18n="filter.start">起始时间</label>
                 <input id="f-start" type="date" />
               </div>
               <div class="filter">
-                <label for="f-end">截止时间</label>
+                <label for="f-end" data-i18n="filter.end">截止时间</label>
                 <input id="f-end" type="date" />
               </div>
               <div class="filter">
-                <label>赛事范围</label>
+                <label data-i18n="filter.scope">赛事范围</label>
                 <div class="segmented" data-name="scope">
-                  <button data-val="all" class="active">全部</button>
-                  <button data-val="international">国际赛</button>
-                  <button data-val="worlds">仅 Worlds</button>
+                  <button data-val="all" class="active" data-i18n="scope.all">全部</button>
+                  <button data-val="international" data-i18n="scope.international">国际赛</button>
+                  <button data-val="worlds" data-i18n="scope.worlds">仅 Worlds</button>
                 </div>
               </div>
               <div class="filter">
-                <label>统计口径</label>
+                <label data-i18n="filter.tally">统计口径</label>
                 <div class="segmented" data-name="tally">
-                  <button data-val="series" class="active">大局</button>
-                  <button data-val="game">小局</button>
+                  <button data-val="series" class="active" data-i18n="tally.series">大局</button>
+                  <button data-val="game" data-i18n="tally.game">小局</button>
                 </div>
               </div>
               <div class="filter">
-                <label for="f-prox">邻近窗口（天）</label>
+                <label for="f-prox" data-i18n="filter.proximity">邻近窗口（天）</label>
                 <input id="f-prox" type="number" min="1" value="90" />
               </div>
               <div class="filter">
-                <label>跨赛制对比（Bo3 vs Bo5）</label>
+                <label data-i18n="filter.crossFormat">跨赛制对比（Bo3 vs Bo5）</label>
                 <div class="segmented" data-name="xf">
-                  <button data-val="off">关闭</button>
-                  <button data-val="strict" class="active">仅零封＞打满</button>
-                  <button data-val="loose">全档位</button>
+                  <button data-val="off" data-i18n="xf.off">关闭</button>
+                  <button data-val="strict" class="active" data-i18n="xf.strict">仅零封＞打满</button>
+                  <button data-val="loose" data-i18n="xf.loose">全档位</button>
                 </div>
               </div>
               <div class="filter">
-                <label>传递链长度上限</label>
+                <label data-i18n="filter.maxChainLen">传递链长度上限</label>
                 <div class="segmented" data-name="len">
                   <button data-val="2">2</button>
                   <button data-val="3" class="active">3</button>
                   <button data-val="5">5</button>
-                  <button data-val="7">不限</button>
+                  <button data-val="7" data-i18n="filter.unlimited">不限</button>
                 </div>
               </div>
             </div>
           </details>
 
           <div class="actions">
-            <button id="judge" class="btn primary">判案</button>
-            <button id="share" class="btn ghost" title="复制可复现链接">复制链接</button>
-            <button id="reset" class="btn ghost">重置</button>
+            <button id="judge" class="btn primary" data-i18n="action.judge">判案</button>
+            <button id="share" class="btn ghost" data-i18n="action.share" data-i18n-title="action.shareTitle" title="复制可复现链接">复制链接</button>
+            <button id="reset" class="btn ghost" data-i18n="action.reset">重置</button>
           </div>
           <p class="data-status" id="data-status">加载数据中…</p>
         </section>
@@ -114,10 +134,10 @@
       </main>
 
       <footer class="site-footer">
-        <p>
+        <p data-i18n="footer.disclaimer">
           娱乐工具，论据 ≠ 真理：在同一份数据下，「A&gt;B」与「B&gt;A」可能同时成立。所有出处均可点击核验。
         </p>
-        <p class="src">数据来源 Oracle's Elixir（比赛数据）与 Leaguepedia（队标），每日自动更新。</p>
+        <p class="src" data-i18n="footer.source">数据来源 Oracle's Elixir（比赛数据）与 Leaguepedia（队标），每日自动更新。</p>
       </footer>
     </div>
     <script type="module" src="/src/main.ts"></script>
