@@ -29,9 +29,15 @@ const $ = <T extends Element>(sel: string, root: ParentNode = document): T => ro
 
 // ---------- 状态 ----------
 let dataset: Dataset;
-let regionGroups: { region: string; label: string; teams: Team[] }[] = [];
+let regionGroups: { region: string; label: string; teams: Team[]; inactive: boolean }[] = [];
+/** 近 365 天无比赛的战队（灰显、排区内末尾）。 */
+let inactiveTeams = new Set<string>();
 const selected: { a: string | null; b: string | null } = { a: null, b: null };
 let lastVerdict: Verdict | null = null;
+
+/** 默认判案：滔博 > T1。 */
+const DEFAULT_A = "Top Esports";
+const DEFAULT_B = "T1";
 
 // ---------- 启动 ----------
 init();
@@ -43,6 +49,17 @@ async function init() {
     $("#data-status").textContent = "数据加载失败：" + String(e);
     return;
   }
+  // 活跃度：最近一场比赛在 365 天内
+  const lastPlayed = new Map<string, number>();
+  for (const s of dataset.series) {
+    const t = Date.parse(s.date);
+    if ((lastPlayed.get(s.t1) ?? 0) < t) lastPlayed.set(s.t1, t);
+    if ((lastPlayed.get(s.t2) ?? 0) < t) lastPlayed.set(s.t2, t);
+  }
+  const activeCutoff = Date.now() - 365 * 24 * 3.6e6;
+  inactiveTeams = new Set(
+    dataset.teams.filter((t) => (lastPlayed.get(t.canonical_id) ?? 0) < activeCutoff).map((t) => t.canonical_id),
+  );
   regionGroups = groupByRegion(dataset.teams);
   const { years, counts } = dataset.index;
   $("#data-status").textContent = `已载入 ${counts.series.toLocaleString()} 场对阵、${counts.teams} 支战队（${years[0]}–${years[years.length - 1]}）。`;
@@ -84,21 +101,33 @@ function regionLabel(region: string): { label: string; order: number } {
   return { label: region || "其他", order: REGION_META.length + (region ? 0 : 1) };
 }
 
-function groupByRegion(teams: Team[]): { region: string; label: string; teams: Team[] }[] {
+function groupByRegion(
+  teams: Team[],
+): { region: string; label: string; teams: Team[]; inactive: boolean }[] {
   const map = new Map<string, Team[]>();
   for (const t of teams) {
     const key = t.region || "";
     if (!map.has(key)) map.set(key, []);
     map.get(key)!.push(t);
   }
+  const isInactive = (t: Team) => inactiveTeams.has(t.canonical_id);
   return [...map.entries()]
     .map(([region, list]) => ({
       region,
       ...regionLabel(region),
-      teams: list.sort((a, b) => a.display_name.localeCompare(b.display_name)),
+      // 活跃在前、不活跃灰显在后，各自按名称排序
+      teams: list.sort(
+        (a, b) =>
+          Number(isInactive(a)) - Number(isInactive(b)) || a.display_name.localeCompare(b.display_name),
+      ),
+      inactive: list.every(isInactive),
     }))
-    .sort((a, b) => a.order - b.order || a.label.localeCompare(b.label))
-    .map(({ region, label, teams }) => ({ region, label, teams }));
+    // 含活跃战队的赛区在前，全员不活跃的赛区灰显垫底
+    .sort(
+      (a, b) =>
+        Number(a.inactive) - Number(b.inactive) || a.order - b.order || a.label.localeCompare(b.label),
+    )
+    .map(({ region, label, teams, inactive }) => ({ region, label, teams, inactive }));
 }
 
 /** 曾用名列表（去重、剔除与显示名相同者，最多 3 个）。 */
@@ -117,10 +146,12 @@ function formerNames(t: Team): string[] {
 
 function teamRow(t: Team, onPick: (t: Team) => void): HTMLElement {
   const former = formerNames(t);
-  const li = h("li", { class: "team-row" } as any, [
+  const inactive = inactiveTeams.has(t.canonical_id);
+  const li = h("li", { class: "team-row" + (inactive ? " inactive" : "") } as any, [
     logoEl(t.canonical_id, t.display_name),
     h("span", { class: "team-name" }, [
       t.display_name,
+      ...(inactive ? [h("span", { class: "former" }, ["（已不活跃）"])] : []),
       ...(former.length ? [h("span", { class: "former" }, [`（曾用名 ${former.join("、")}）`])] : []),
     ]),
   ]);
@@ -198,11 +229,16 @@ function setupCombo(side: "a" | "b") {
   const renderRegions = () => {
     regionList.replaceChildren(
       ...regionGroups.map((g, i) => {
-        const li = h("li", { class: i === activeRegion ? "active" : "" } as any, [
+        const cls = [i === activeRegion ? "active" : "", g.inactive ? "inactive" : ""]
+          .filter(Boolean)
+          .join(" ");
+        const li = h("li", { class: cls } as any, [
           g.label,
           h("span", { class: "count" }, [String(g.teams.length)]),
         ]);
-        li.addEventListener("click", () => {
+        li.addEventListener("click", (e) => {
+          // 重渲染会把被点元素移出 DOM，阻止冒泡以免"点击面板外关闭"误判
+          e.stopPropagation();
           activeRegion = i;
           renderRegions();
           renderTeams();
@@ -570,8 +606,12 @@ function updateUrl(filters: Filters) {
 }
 
 function restoreFromUrl() {
-  const { a, b, filters } = decodeState(location.search);
+  const { a: qa, b: qb, filters } = decodeState(location.search);
   writeFilters(filters);
+  // 无 URL 参数时的默认判案：滔博 > T1
+  const fresh = !qa && !qb;
+  const a = qa ?? (fresh ? DEFAULT_A : null);
+  const b = qb ?? (fresh ? DEFAULT_B : null);
   if (a && dataset.teamById.has(a)) {
     selected.a = a;
     setTrigger("a", dataset.teamById.get(a)!);

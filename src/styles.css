@@ -217,6 +217,18 @@ body {
   background: var(--accent-soft);
   color: var(--accent);
 }
+.region-list li.inactive {
+  opacity: 0.45;
+}
+.region-list li.inactive.active {
+  opacity: 0.8;
+}
+.team-list .team-row.inactive {
+  opacity: 0.5;
+}
+.team-list .team-row.inactive .team-logo {
+  filter: grayscale(1);
+}
 .team-list .team-row {
   display: flex;
   align-items: center;
