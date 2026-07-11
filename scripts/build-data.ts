@@ -7,7 +7,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { LEAGUE_INFO, readTeamRows, type OeGameRow } from "./oe.ts";
-import type { DataIndex, Game, OverridesFile, Series, SeriesFlag, Team } from "../shared/types";
+import type { DataIndex, Game, OverridesFile, Series, SeriesFlag, Stage, Team } from "../shared/types";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CSV_DIR = join(__dirname, "..", "data");
@@ -131,12 +131,19 @@ function buildYear(games: GamePair[], year: number): { series: Series[]; games: 
       const wa = cur.filter((g) => g.winner === a).length;
       const wb = cur.length - wa;
       const first = cur[0];
+      const tier = LEAGUE_INFO[first.league].tier;
+      const bestOf = inferBestOf(wa, wb);
+      // 阶段：国内赛按 playoffs 标记；国际赛 OE 全部 playoffs=0，按赛制近似（Bo5=淘汰赛）
+      const stage: Stage =
+        tier === "domestic" ? (first.playoffs ? "playoffs" : "regular") : bestOf === 5 ? "knockout" : "groups";
       series.push({
         id: first.gameid,
         date: first.date,
         tournament: tournamentLabel(first, year),
-        tier: LEAGUE_INFO[first.league].tier,
-        best_of: inferBestOf(wa, wb),
+        tier,
+        league: first.league,
+        stage,
+        best_of: bestOf,
         t1: a,
         t2: b,
         s1: wa,
@@ -160,6 +167,19 @@ function buildYear(games: GamePair[], year: number): { series: Series[]; games: 
     flush();
   }
   series.sort((a, b) => a.date.localeCompare(b.date));
+
+  // 决赛标注：每个赛事时间上最后一场（须为季后赛/淘汰赛，且赛事已结束 ≥14 天，避免进行中误标）
+  const lastByTournament = new Map<string, Series>();
+  for (const s of series) {
+    const cur = lastByTournament.get(s.tournament);
+    if (!cur || s.date > cur.date) lastByTournament.set(s.tournament, s);
+  }
+  const cutoff = Date.now() - 14 * 24 * 3.6e6;
+  for (const s of lastByTournament.values()) {
+    if ((s.stage === "playoffs" || s.stage === "knockout") && Date.parse(s.date) < cutoff) {
+      s.stage = "final";
+    }
+  }
   return { series, games: gameOut };
 }
 

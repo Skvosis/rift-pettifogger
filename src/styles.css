@@ -417,18 +417,12 @@ body {
   border: 1px solid var(--border);
   border-left: 3px solid var(--accent);
   border-radius: var(--radius-sm);
-  padding: 14px 16px;
-  margin-bottom: 12px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
   box-shadow: var(--shadow);
 }
 .reverse .arg-card {
   border-left-color: var(--defense);
-}
-.arg-chain {
-  font-size: 14.5px;
-  font-weight: 600;
-  margin-bottom: 4px;
-  word-break: break-word;
 }
 .arg-kind {
   display: inline-block;
@@ -437,39 +431,205 @@ body {
   letter-spacing: 0.5px;
   padding: 1px 8px;
   border-radius: 5px;
-  margin-right: 8px;
+  margin-bottom: 8px;
   background: var(--accent-soft);
   color: var(--accent);
-  vertical-align: middle;
 }
 .reverse .arg-kind {
   background: var(--defense-soft);
   color: var(--defense);
 }
-.hop {
-  margin-top: 10px;
-  padding-left: 12px;
-  border-left: 2px solid var(--border);
+
+/* ---------- 链条（水平） ---------- */
+.chain-row {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 4px;
 }
-.hop-title {
-  font-size: 13.5px;
-  font-weight: 600;
-}
-.hop-detail {
-  font-size: 13px;
+.chain-arrow {
+  align-self: center;
   color: var(--muted);
-  margin-top: 2px;
+  font-size: 18px;
+  font-weight: 700;
+  flex-shrink: 0;
 }
-.hop a {
-  font-size: 12px;
+
+/* ---------- 一环：上比赛，下结论 ---------- */
+.link-box {
+  flex: 0 0 auto;
+  min-width: 220px;
+  max-width: 300px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card-2);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.link-matches {
+  padding: 10px 10px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+.link-note {
+  font-size: 11.5px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+.link-note.strong {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+.link-verdict {
+  border-top: 1px dashed var(--border);
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: var(--card);
+}
+.link-verdict .gt {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--accent);
+}
+.reverse .link-verdict .gt {
+  color: var(--defense);
+}
+.verdict-rule {
+  font-size: 10.5px;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  margin-left: 2px;
+  white-space: nowrap;
+}
+
+/* ---------- 比分行 ---------- */
+.match-line {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.match-teams {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+.score {
+  font-size: 17px;
+  font-weight: 800;
+  display: flex;
+  gap: 5px;
+  align-items: baseline;
+  font-variant-numeric: tabular-nums;
+}
+.score .colon {
+  color: var(--muted);
+  font-weight: 400;
+}
+.score .win {
+  color: var(--win);
+}
+.score .loss {
+  color: var(--muted);
+  opacity: 0.75;
+}
+.match-meta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  font-size: 10.5px;
+  color: var(--muted);
+}
+.badge {
+  border-radius: 4px;
+  padding: 0.5px 5px;
+  font-weight: 600;
+  background: var(--card);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+.badge.league {
+  color: var(--text);
+}
+.badge.league.intl {
+  color: var(--accent);
+  border-color: var(--accent-soft);
+  background: var(--accent-soft);
+}
+.badge.stage.final {
+  color: #b8860b;
+  border-color: rgba(184, 134, 11, 0.35);
+  background: rgba(218, 165, 32, 0.12);
+}
+.badge.warn {
+  color: #b45309;
+}
+.date {
+  white-space: nowrap;
+}
+.src-link,
+.games-toggle {
   color: var(--defense);
   text-decoration: none;
+  white-space: nowrap;
 }
-.hop a:hover {
+.src-link:hover,
+.games-toggle:hover {
   text-decoration: underline;
 }
-.hop a.games-toggle {
+.games-detail {
   color: var(--muted);
+}
+
+/* ---------- 队徽芯片 ---------- */
+.team-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 52px;
+  max-width: 86px;
+}
+.team-chip .team-logo {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  font-size: 11px;
+}
+.team-chip.dim {
+  opacity: 0.75;
+}
+.chip-name {
+  font-size: 10px;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.25;
+  max-width: 86px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.link-verdict .team-chip .team-logo {
+  width: 26px;
+  height: 26px;
+}
+.link-verdict .chip-name {
+  font-size: 9.5px;
+  max-width: 70px;
+  -webkit-line-clamp: 1;
 }
 
 .reverse-section {

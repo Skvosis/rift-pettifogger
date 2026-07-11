@@ -7,7 +7,9 @@ import { defaultFilters, encodeState, decodeState, resolvedEnd } from "./engine/
 import { judge } from "./engine/graph";
 import { findWinningFilters } from "./engine/mouthhard";
 import { verdictToText } from "./ui/copy";
-import { RULE_NAME, chainSummary, describeEdge, name as teamName } from "./ui/describe";
+import { RULE_NAME, leagueLabel, name as teamName, stageLabel } from "./ui/describe";
+import type { SeriesEvidence } from "./engine/types";
+import type { Edge } from "./engine/types";
 import { gamesOfSeries } from "./games";
 
 // ---------- 小工具 ----------
@@ -126,17 +128,28 @@ function teamRow(t: Team, onPick: (t: Team) => void): HTMLElement {
   return li;
 }
 
-/** 队标元素：先放首字母头像，异步解析到 URL 后替换。 */
+/** 队标元素：先放首字母头像，异步解析到 URL 后替换（同队可同时出现在多处）。 */
 function logoEl(teamId: string, display: string): HTMLElement {
+  const known = logoUrls.get(teamId);
+  if (known) return logoImg(known);
   const holder = h("span", { class: "team-logo" }, [display.slice(0, 2)]);
   pendingLogoIds.add(teamId);
-  logoHolders.set(teamId, holder);
+  let holders = logoHolders.get(teamId);
+  if (!holders) logoHolders.set(teamId, (holders = []));
+  holders.push(holder);
   scheduleLogoResolve();
   return holder;
 }
 
+function logoImg(url: string): HTMLElement {
+  const img = h("img", { src: url, alt: "", loading: "lazy" } as any);
+  img.className = "team-logo img";
+  return img;
+}
+
 const pendingLogoIds = new Set<string>();
-const logoHolders = new Map<string, HTMLElement>();
+const logoHolders = new Map<string, HTMLElement[]>();
+const logoUrls = new Map<string, string>();
 let logoTimer: number | undefined;
 function scheduleLogoResolve() {
   clearTimeout(logoTimer);
@@ -146,12 +159,11 @@ function scheduleLogoResolve() {
     if (!ids.length) return;
     const urls = await resolveLogos(ids);
     for (const [id, url] of urls) {
-      const holder = logoHolders.get(id);
-      if (!holder) continue;
-      const img = h("img", { src: url, alt: "", loading: "lazy" } as any);
-      img.className = "team-logo img";
-      holder.replaceWith(img);
-      logoHolders.set(id, img);
+      logoUrls.set(id, url);
+      for (const holder of logoHolders.get(id) ?? []) {
+        if (holder.isConnected) holder.replaceWith(logoImg(url));
+      }
+      logoHolders.delete(id);
     }
   }, 80);
 }
@@ -371,39 +383,104 @@ function renderArgList(args: Argument[], variant: "forward" | "reverse"): HTMLEl
 
 function renderArg(arg: Argument): HTMLElement {
   const card = h("div", { class: "arg-card" });
-  const kind = arg.path.length === 1 ? RULE_NAME[arg.path[0].rule] : "传递链";
-  const headText =
-    arg.path.length > 1
-      ? chainSummary(dataset.teamById, arg)
-      : describeEdge(dataset.teamById, arg.path[0]).title;
-  card.append(
-    h("div", { class: "arg-chain" }, [h("span", { class: "arg-kind" }, [kind]), document.createTextNode(headText)]),
-  );
-  for (const e of arg.path) {
-    const d = describeEdge(dataset.teamById, e);
-    const hop = h("div", { class: "hop" }, [h("div", { class: "hop-title" }, [d.title])]);
-    for (const detail of d.details) hop.append(h("div", { class: "hop-detail" }, [detail]));
-    if (d.url) hop.append(h("a", { href: d.url, target: "_blank", rel: "noreferrer" } as any, ["查看原始出处 ↗"]));
-    if (e.evidence.kind === "rule1") appendGameExpand(hop, e.evidence.series.id, e.evidence.series.date);
-    card.append(hop);
-  }
+  const kind = arg.path.length === 1 ? RULE_NAME[arg.path[0].rule] : `传递链 · ${arg.path.length} 环`;
+  card.append(h("div", { class: "arg-kind" }, [kind]));
+  const chain = h("div", { class: "chain-row" });
+  arg.path.forEach((e, i) => {
+    if (i > 0) chain.append(h("div", { class: "chain-arrow" }, ["→"]));
+    chain.append(renderLinkBox(e));
+  });
+  card.append(chain);
   return card;
 }
 
-/** 规则 1 证据卡上的“逐局”按需展开。 */
-function appendGameExpand(hop: HTMLElement, seriesId: string, date: string) {
-  const btn = h("a", { href: "javascript:void 0", class: "games-toggle" } as any, [" · 逐局"]);
+/** 队徽 + 下方小字全名。 */
+function teamChip(id: string, opts: { dim?: boolean } = {}): HTMLElement {
+  const chip = h("div", { class: "team-chip" + (opts.dim ? " dim" : "") });
+  chip.append(logoEl(id, teamName(dataset.teamById, id)));
+  chip.append(h("span", { class: "chip-name" }, [teamName(dataset.teamById, id)]));
+  chip.title = teamName(dataset.teamById, id);
+  return chip;
+}
+
+/** 一场 series 的比分行：队徽 比分 队徽 + 赛区/阶段/日期徽标。 */
+function matchLine(ev: SeriesEvidence): HTMLElement {
+  const won = ev.selfScore > ev.oppScore;
+  const line = h("div", { class: "match-line" });
+  const score = h("div", { class: "score" }, [
+    h("span", { class: won ? "win" : "loss" }, [String(ev.selfScore)]),
+    h("span", { class: "colon" }, [":"]),
+    h("span", { class: won ? "loss" : "win" }, [String(ev.oppScore)]),
+  ]);
+  const row = h("div", { class: "match-teams" }, [teamChip(ev.self), score, teamChip(ev.opp)]);
+  line.append(row);
+  const meta = h("div", { class: "match-meta" });
+  const lg = leagueLabel(ev.league);
+  if (lg) meta.append(h("span", { class: "badge league" + (ev.tier !== "domestic" ? " intl" : "") }, [lg]));
+  const st = stageLabel(ev.stage);
+  if (st) meta.append(h("span", { class: "badge stage" + (ev.stage === "final" ? " final" : "") }, [st]));
+  meta.append(h("span", { class: "badge bo" }, [`Bo${ev.best_of}`]));
+  meta.append(h("span", { class: "date" }, [ev.date.slice(0, 10)]));
+  if (ev.flags.includes("ff")) meta.append(h("span", { class: "badge warn" }, ["含弃权"]));
+  const src = h("a", { href: ev.url, target: "_blank", rel: "noreferrer", title: "查看出处" } as any, ["出处↗"]);
+  src.className = "src-link";
+  meta.append(src);
+  appendGameExpand(meta, ev.id, ev.date);
+  line.append(meta);
+  return line;
+}
+
+/** 一环：上方比赛，下方结论（谁 > 谁 + 规则依据）。 */
+function renderLinkBox(e: Edge): HTMLElement {
+  const box = h("div", { class: "link-box" });
+  const matches = h("div", { class: "link-matches" });
+  if (e.evidence.kind === "rule1") {
+    matches.append(matchLine(e.evidence.series));
+  } else if (e.evidence.kind === "rule2") {
+    matches.append(matchLine(e.evidence.aSeries));
+    matches.append(matchLine(e.evidence.bSeries));
+    matches.append(h("div", { class: "link-note" }, [e.evidence.note]));
+  } else {
+    const ev = e.evidence;
+    const caption = ev.tally === "game" ? "小局" : "大局";
+    const scopeNote = ev.downgraded ? `（口径已收窄：${scopeText(ev.scopeUsed)}）` : "";
+    matches.append(
+      h("div", { class: "link-note strong" }, [
+        `历史战绩 ${ev.wins}-${ev.total - ev.wins}（按${caption}，胜率 ${(ev.rate * 100).toFixed(0)}%）${scopeNote}`,
+      ]),
+    );
+    for (const s of ev.series.slice(0, 3)) matches.append(matchLine(s));
+    if (ev.series.length > 3) {
+      matches.append(h("div", { class: "link-note" }, [`…共 ${ev.series.length} 场交手`]));
+    }
+  }
+  box.append(matches);
+  box.append(
+    h("div", { class: "link-verdict" }, [
+      teamChip(e.from),
+      h("span", { class: "gt" }, ["＞"]),
+      teamChip(e.to, { dim: true }),
+      h("span", { class: "verdict-rule" }, [RULE_NAME[e.rule]]),
+    ]),
+  );
+  return box;
+}
+
+function scopeText(s: string): string {
+  return s === "worlds" ? "仅 Worlds" : s === "international" ? "国际赛" : "全部";
+}
+
+/** 比分行上的“逐局”按需展开。 */
+function appendGameExpand(meta: HTMLElement, seriesId: string, date: string) {
+  const btn = h("a", { href: "javascript:void 0", class: "games-toggle" } as any, ["逐局"]);
   btn.addEventListener("click", async () => {
-    btn.remove();
     const games = await gamesOfSeries(seriesId, date);
     const text = games.length
-      ? games
-          .map((g) => `G${g.game_n} ${teamName(dataset.teamById, g.winner)} 胜`)
-          .join(" / ")
+      ? games.map((g) => `G${g.game_n} ${teamName(dataset.teamById, g.winner)}`).join(" / ")
       : "暂无逐局数据";
-    hop.append(h("div", { class: "hop-detail" }, [`逐局：${text}`]));
+    btn.replaceWith(h("span", { class: "games-detail" }, [text]));
   });
-  hop.append(btn);
+  meta.append(btn);
 }
 
 // ---------- 嘴硬模式 ----------

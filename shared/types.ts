@@ -7,15 +7,21 @@ export type Tier = "worlds" | "international" | "domestic";
 /** series 特殊标记：弃权 / 重赛等。 */
 export type SeriesFlag = "ff" | "rematch" | "nullified";
 
+/** 赛事阶段（构建期推导）。 */
+export type Stage = "regular" | "groups" | "knockout" | "playoffs" | "final";
+
 /** 一次 BoX 对阵整体（大局）。 */
 export interface Series {
   /** 稳定唯一 id（来自 Leaguepedia MatchId，回退为构造 id）。 */
   id: string;
   /** ISO 日期时间（UTC）。 */
   date: string;
-  /** 所属赛事 OverviewPage，如 "LCK/2024 Season/Spring Season"。 */
+  /** 所属赛事标签，如 "LCK 2024 Spring Playoffs"。 */
   tournament: string;
   tier: Tier;
+  /** 联赛代码（LPL/LCK/MSI/WLDs/FST…）。 */
+  league?: string;
+  stage?: Stage;
   /** 赛制：1/3/5。0 表示未知。 */
   best_of: number;
   /** 规范化 canonical_id。 */

@@ -1,4 +1,4 @@
-import type { Series, Tier, SeriesFlag } from "../../shared/types";
+import type { Series, Tier, SeriesFlag, Stage } from "../../shared/types";
 
 /** 赛事范围过滤。 */
 export type Scope = "all" | "international" | "worlds";
@@ -27,6 +27,8 @@ export interface SeriesEvidence {
   date: string;
   tournament: string;
   tier: Tier;
+  league?: string;
+  stage?: Stage;
   best_of: number;
   flags: SeriesFlag[];
   /** 主语队 canonical_id。 */

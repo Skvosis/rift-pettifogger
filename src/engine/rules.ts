@@ -30,6 +30,8 @@ export function toEvidence(s: Series, team: string): SeriesEvidence {
     date: s.date,
     tournament: s.tournament,
     tier: s.tier,
+    league: s.league,
+    stage: s.stage,
     best_of: s.best_of,
     flags: s.flags,
     self: team,

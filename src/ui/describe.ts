@@ -25,6 +25,32 @@ export function tournamentLabel(page: string): string {
   return page.replace(/\//g, " · ");
 }
 
+/** 联赛代码 -> 展示标签（国际赛用中文，赛区用通称）。 */
+export function leagueLabel(league: string | undefined): string {
+  if (!league) return "";
+  const map: Record<string, string> = {
+    WLDs: "世界赛",
+    MSI: "MSI",
+    FST: "先锋赛",
+    OGN: "LCK",
+    "EU LCS": "EU LCS",
+    "NA LCS": "NA LCS",
+  };
+  return map[league] ?? league;
+}
+
+/** 阶段 -> 中文标签。 */
+export function stageLabel(stage: string | undefined): string {
+  const map: Record<string, string> = {
+    regular: "常规赛",
+    groups: "小组赛",
+    knockout: "淘汰赛",
+    playoffs: "季后赛",
+    final: "决赛",
+  };
+  return stage ? (map[stage] ?? "") : "";
+}
+
 function bo(n: number): string {
   return n === 1 ? "Bo1" : `Bo${n}`;
 }
@@ -36,14 +62,16 @@ function flagNote(ev: SeriesEvidence): string {
   return notes.length ? `（${notes.join("、")}）` : "";
 }
 
-/** "T1 3-2 击败 Gen.G · 2024-09-08 · LCK … · Bo5" */
+/** "T1 3-2 击败 Gen.G · 2024-09-08 · LCK 2024 Summer Playoffs · 决赛 · Bo5" */
 export function describeSeries(teams: Teams, ev: SeriesEvidence): string {
   const self = name(teams, ev.self);
   const opp = name(teams, ev.opp);
   const verb = ev.selfScore > ev.oppScore ? "击败" : "负于";
-  const score = ev.selfScore > ev.oppScore ? `${ev.selfScore}-${ev.oppScore}` : `${ev.selfScore}-${ev.oppScore}`;
   const day = ev.date.slice(0, 10);
-  return `${self} ${score} ${verb} ${opp} · ${day} · ${tournamentLabel(ev.tournament)} · ${bo(ev.best_of)}${flagNote(ev)}`;
+  // 决赛始终标注；国际赛标注小组赛/淘汰赛（标签本身不含阶段）
+  const stage =
+    ev.stage === "final" ? " · 决赛" : ev.tier !== "domestic" && ev.stage ? ` · ${stageLabel(ev.stage)}` : "";
+  return `${self} ${ev.selfScore}-${ev.oppScore} ${verb} ${opp} · ${day} · ${tournamentLabel(ev.tournament)}${stage} · ${bo(ev.best_of)}${flagNote(ev)}`;
 }
 
 /** 一条边的标题与明细（明细可多行）。 */
