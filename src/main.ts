@@ -432,7 +432,15 @@ function renderArgList(args: Argument[], variant: "forward" | "reverse"): HTMLEl
 function renderArg(arg: Argument): HTMLElement {
   const card = h("div", { class: "arg-card" });
   const kind = arg.path.length === 1 ? RULE_NAME[arg.path[0].rule] : `传递链 · ${arg.path.length} 环`;
-  card.append(h("div", { class: "arg-kind" }, [kind]));
+  const score = (arg.chainStrength * 100).toFixed(0);
+  card.append(
+    h("div", { class: "arg-head" }, [
+      h("span", { class: "arg-kind" }, [kind]),
+      h("span", { class: "arg-score", title: "综合规则可信度、赛事级别、阶段、赛制与新旧的含金量评分" }, [
+        `含金量 ${score}`,
+      ]),
+    ]),
+  );
   const chain = h("div", { class: "chain-row" });
   arg.path.forEach((e, i) => {
     if (i > 0) chain.append(h("div", { class: "chain-arrow" }, ["→"]));

@@ -73,7 +73,7 @@ export interface Edge {
   from: string;
   to: string;
   rule: RuleId;
-  /** 排序用标量：规则档位主导，同规则内时间越近越大。 */
+  /** 含金量 Q ∈ (0,1]：规则可信度 × 比赛含金量 × 时间衰减（见 QUALITY）。 */
   strength: number;
   /** 该边代表时间（同规则内比较用）。 */
   date: string;
@@ -99,12 +99,42 @@ export interface Verdict {
   hint?: string;
 }
 
-/** 边强度标量：规则档位 * BIG + 时间戳，规则档位始终压过时间。
- * 规则 1（直接交手）最强，其次规则 2、规则 3，故取 (4 - rule) 作档位。 */
-const RULE_BASE = 1e13;
-export function edgeStrength(rule: RuleId, date: string): number {
-  const t = Date.parse(date) || 0;
-  return (4 - rule) * RULE_BASE + t;
+// ---------- 含金量（论据排序权重，可按需调整） ----------
+
+export const QUALITY = {
+  /** 规则本身的可信度：直接交手 > 共同对手 > 历史战绩。 */
+  rule: { 1: 1.0, 2: 0.7, 3: 0.55 } as Record<RuleId, number>,
+  /** 赛事级别：世界赛 > MSI/先锋赛 > 赛区。 */
+  tier: { worlds: 1.0, international: 0.9, domestic: 0.75 } as Record<Tier, number>,
+  /** 阶段：决赛 > 淘汰赛/季后赛 > 小组赛/常规赛。 */
+  stage: {
+    final: 1.0,
+    knockout: 0.92,
+    playoffs: 0.92,
+    groups: 0.8,
+    regular: 0.78,
+  } as Record<Stage, number>,
+  stageDefault: 0.8,
+  /** 赛制：Bo5 > Bo3 > Bo2 > Bo1。 */
+  bo: (n: number): number => (n >= 5 ? 1 : n >= 3 ? 0.85 : n === 2 ? 0.75 : 0.65),
+  /** 时间衰减半衰期（天）：一年前的比赛含金量减半。 */
+  halfLifeDays: 365,
+  /** 传递链每多一环的折扣。 */
+  chainDecay: 0.6,
+  /** 规则 3 样本量因子：1 场 0.7、2 场 0.85、3 场及以上 1.0。 */
+  sample: (n: number): number => Math.min(1, 0.55 + 0.15 * n),
+};
+
+/** 单场比赛的含金量（级别 × 阶段 × 赛制）。 */
+export function matchQuality(tier: Tier, stage: Stage | undefined, bestOf: number): number {
+  const st = stage ? QUALITY.stage[stage] : QUALITY.stageDefault;
+  return QUALITY.tier[tier] * st * QUALITY.bo(bestOf);
+}
+
+/** 时间衰减因子（越新越接近 1）。 */
+export function recencyFactor(date: string, now = Date.now()): number {
+  const age = Math.max(0, now - (Date.parse(date) || now));
+  return Math.pow(0.5, age / (QUALITY.halfLifeDays * 864e5));
 }
 
 /** series 是否落在时间窗内。 */

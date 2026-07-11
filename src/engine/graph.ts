@@ -2,7 +2,7 @@
 import type { Series } from "../../shared/types";
 import type { Argument, Edge, Filters, Verdict } from "./types";
 import { rule1, rule2All, rule3 } from "./rules";
-import { inTimeWindow } from "./types";
+import { QUALITY, inTimeWindow } from "./types";
 
 // 枚举上限，防止稠密图爆炸（仍足以覆盖“展示前 5 条”的需求）。
 const MAX_DEPTH = 7;
@@ -90,7 +90,7 @@ export function findArguments(
 ): Argument[] {
   // 直接边：每条规则各作为一条 length-1 论证
   const direct = edges.filter((e) => e.from === a && e.to === b);
-  const args: Argument[] = direct.map((e) => ({ path: [e], chainStrength: e.strength }));
+  const args: Argument[] = direct.map((e) => ({ path: [e], chainStrength: chainScore([e]) }));
 
   // 传递链：每个有向对取最强边建简单图
   const best = new Map<string, Edge>();
@@ -117,7 +117,7 @@ export function findArguments(
       const nextPath = [...path, e];
       if (e.to === b) {
         if (nextPath.length >= 2) {
-          args.push({ path: nextPath, chainStrength: chainStrength(nextPath) });
+          args.push({ path: nextPath, chainStrength: chainScore(nextPath) });
         }
         continue; // 到达 B 即停（简单路径不再延伸）
       }
@@ -127,13 +127,15 @@ export function findArguments(
     }
   }
 
-  // 强度优先（链强度 = 最弱一环），同强度再比链长
+  // 含金量优先，同分再比链长
   args.sort((x, y) => y.chainStrength - x.chainStrength || x.path.length - y.path.length);
   return args;
 }
 
-function chainStrength(path: Edge[]): number {
-  return path.reduce((m, e) => Math.min(m, e.strength), Infinity);
+/** 链条得分 = 最弱一环的含金量 × 每多一环的折扣（长链天然弱于短链，但强链可胜过弱的短链）。 */
+function chainScore(path: Edge[]): number {
+  const minQ = path.reduce((m, e) => Math.min(m, e.strength), Infinity);
+  return minQ * Math.pow(QUALITY.chainDecay, path.length - 1);
 }
 
 /** 正方无路径时，给出最可能有戏的放宽建议。 */

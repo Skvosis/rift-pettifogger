@@ -2,12 +2,38 @@
 import type { Series } from "../../shared/types";
 import type { Edge, Filters, SeriesEvidence, Tally } from "./types";
 import {
-  edgeStrength,
+  QUALITY,
   inScope,
   inTimeWindow,
   leaguepediaUrl,
+  matchQuality,
+  recencyFactor,
   scopeDowngradeSequence,
 } from "./types";
+
+/** 规则 1 边的含金量：规则可信度 × 该场比赛含金量 × 时间衰减。 */
+function rule1Strength(s: Series): number {
+  return QUALITY.rule[1] * matchQuality(s.tier, s.stage, s.best_of) * recencyFactor(s.date);
+}
+
+/** 规则 2 边的含金量：取两场中较弱者（最弱环哲学），时间取较旧一场。 */
+function rule2Strength(sa: Series, sb: Series): number {
+  const mq = Math.min(
+    matchQuality(sa.tier, sa.stage, sa.best_of),
+    matchQuality(sb.tier, sb.stage, sb.best_of),
+  );
+  const rec = Math.min(recencyFactor(sa.date), recencyFactor(sb.date));
+  return QUALITY.rule[2] * mq * rec;
+}
+
+/** 规则 3 边的含金量：样本均值 × 胜率加成 × 样本量因子 × 最近一场的时间衰减。 */
+function rule3Strength(scoped: Series[], rate: number, latestDate: string): number {
+  const mean =
+    scoped.reduce((sum, s) => sum + matchQuality(s.tier, s.stage, s.best_of), 0) / scoped.length;
+  return (
+    QUALITY.rule[3] * mean * (0.5 + 0.5 * rate) * QUALITY.sample(scoped.length) * recencyFactor(latestDate)
+  );
+}
 
 // ---------- 通用工具 ----------
 
@@ -77,7 +103,7 @@ export function rule1(all: Series[], a: string, b: string, f: Filters): Edge | n
     from: winner,
     to: loser,
     rule: 1,
-    strength: edgeStrength(1, latest.date),
+    strength: rule1Strength(latest),
     date: latest.date,
     evidence: { kind: "rule1", series: toEvidence(latest, winner) },
   };
@@ -133,7 +159,7 @@ export function rule3(all: Series[], a: string, b: string, f: Filters): Edge | n
         from: a,
         to: b,
         rule: 3,
-        strength: edgeStrength(3, latest.date),
+        strength: rule3Strength(scoped, stat.rate, latest.date),
         date: latest.date,
         evidence: {
           kind: "rule3",
@@ -238,7 +264,7 @@ export function rule2(all: Series[], a: string, b: string, f: Filters): Edge[] {
           from,
           to,
           rule: 2,
-          strength: edgeStrength(2, repDate),
+          strength: rule2Strength(sa, sb),
           date: repDate,
           evidence: {
             kind: "rule2",
@@ -305,7 +331,7 @@ export function rule2All(all: Series[], f: Filters): Edge[] {
           from,
           to,
           rule: 2,
-          strength: edgeStrength(2, repDate),
+          strength: rule2Strength(A.s, B.s),
           date: repDate,
           evidence: {
             kind: "rule2",
