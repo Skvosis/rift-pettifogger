@@ -176,19 +176,20 @@ function sameFormatWinner(
   return { winner, note: "同样负于共同对手，拿下更多局" };
 }
 
-/** 跨赛制：按档位比较。strict 要求档位差 = 2。 */
+/** 跨赛制：按档位比较。off 不产边；strict 要求档位差 = 2（仅零封＞打满）；loose 档位不同即可。 */
 function crossFormatWinner(
   aEv: SeriesEvidence,
   bEv: SeriesEvidence,
-  strict: boolean,
+  mode: "off" | "strict" | "loose",
 ): { winner: "a" | "b"; note: string } | null {
+  if (mode === "off") return null;
   const aWon = aEv.selfScore > aEv.oppScore;
   const bWon = bEv.selfScore > bEv.oppScore;
   if (aWon !== bWon) return null;
   const ta = performanceTier(aEv.selfScore, aEv.oppScore);
   const tb = performanceTier(bEv.selfScore, bEv.oppScore);
   if (ta === tb) return null;
-  if (strict && Math.abs(ta - tb) !== 2) return null;
+  if (mode === "strict" && Math.abs(ta - tb) !== 2) return null;
   const winner = ta > tb ? "a" : "b";
   return { winner, note: `跨赛制对比对手表现更强（档位 ${Math.max(ta, tb)} vs ${Math.min(ta, tb)}）` };
 }
@@ -228,7 +229,7 @@ export function rule2(all: Series[], a: string, b: string, f: Filters): Edge[] {
         const sameFormat = sa.best_of === sb.best_of;
         const verdict = sameFormat
           ? sameFormatWinner(aEv, bEv)
-          : crossFormatWinner(aEv, bEv, f.strict);
+          : crossFormatWinner(aEv, bEv, f.crossFormat);
         if (!verdict) continue;
         const from = verdict.winner === "a" ? a : b;
         const to = verdict.winner === "a" ? b : a;
@@ -289,7 +290,7 @@ export function rule2All(all: Series[], f: Filters): Edge[] {
       const sameFormat = A.s.best_of === B.s.best_of;
       const verdict = sameFormat
         ? sameFormatWinner(xEv, yEv)
-        : crossFormatWinner(xEv, yEv, f.strict);
+        : crossFormatWinner(xEv, yEv, f.crossFormat);
       if (!verdict) return;
       const from = verdict.winner === "a" ? A.opp : B.opp;
       const to = from === A.opp ? B.opp : A.opp;

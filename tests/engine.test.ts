@@ -26,7 +26,14 @@ function s(
     flags: opts.flags ?? [],
   };
 }
-const F = (o: Partial<Filters> = {}): Filters => ({ ...defaultFilters(), ...o });
+// 测试基线：固定时间窗（测试数据为 2024 年）、跨赛制全档位、链长不限；单测各自覆盖收紧场景
+const F = (o: Partial<Filters> = {}): Filters => ({
+  ...defaultFilters(),
+  start: null,
+  crossFormat: "loose",
+  maxChainLen: 7,
+  ...o,
+});
 
 describe("performanceTier 跨赛制档位表", () => {
   it("胜方档位", () => {
@@ -129,21 +136,26 @@ describe("规则 2 共同对手", () => {
     const data = [s("A", "C", 1, 0, { best_of: 1 }), s("B", "C", 1, 0, { best_of: 1 })];
     expect(rule2(data, "A", "B", F()).length).toBe(0);
   });
-  it("跨赛制按档位；严格模式要求档位差=2", () => {
+  it("跨赛制三档：off 不产边；strict 要求档位差=2（零封 vs 打满）；loose 档位不同即可", () => {
     // A 被横扫 0-3 (Bo5, 档0)，B 打满 1-2 (Bo3, 档2) 同负于 C -> B>A，档差2
     const data = [
       s("A", "C", 0, 3, { best_of: 5 }),
       s("B", "C", 1, 2, { best_of: 3 }),
     ];
-    expect(rule2(data, "A", "B", F({ strict: false }))[0]?.from).toBe("B");
-    expect(rule2(data, "A", "B", F({ strict: true }))[0]?.from).toBe("B");
-    // 档差=1 时严格模式不产边：A 0-3(档0) vs B 1-3(Bo5? 需跨赛制) —— 用 Bo3 1-2(档2) vs Bo5 1-3(档1) 档差1
+    expect(rule2(data, "A", "B", F({ crossFormat: "loose" }))[0]?.from).toBe("B");
+    expect(rule2(data, "A", "B", F({ crossFormat: "strict" }))[0]?.from).toBe("B");
+    expect(rule2(data, "A", "B", F({ crossFormat: "off" })).length).toBe(0);
+    // 档差=1：loose 产边，strict 不产边 —— Bo3 1-2(档2) vs Bo5 1-3(档1)
     const data2 = [
       s("A", "C", 1, 2, { best_of: 3 }), // 档2
       s("B", "C", 1, 3, { best_of: 5 }), // 档1
     ];
-    expect(rule2(data2, "A", "B", F({ strict: false })).length).toBe(1);
-    expect(rule2(data2, "A", "B", F({ strict: true })).length).toBe(0);
+    expect(rule2(data2, "A", "B", F({ crossFormat: "loose" })).length).toBe(1);
+    expect(rule2(data2, "A", "B", F({ crossFormat: "strict" })).length).toBe(0);
+  });
+  it("跨赛制 off 不影响同赛制比较", () => {
+    const data = [s("A", "C", 2, 0), s("B", "C", 2, 1)];
+    expect(rule2(data, "A", "B", F({ crossFormat: "off" }))[0]?.from).toBe("A");
   });
   it("邻近窗口外不产边（跨赛事）", () => {
     const data = [
@@ -185,6 +197,14 @@ describe("图搜索与判案", () => {
     const v = judge(data, "A", "B", F());
     expect(v.forward.length).toBeGreaterThan(0);
     expect(v.reverse.length).toBeGreaterThan(0);
+  });
+  it("链长上限生效", () => {
+    const data = [
+      s("A", "C", 2, 0, { date: "2024-05-01" }),
+      s("C", "B", 2, 0, { date: "2024-03-01" }),
+    ];
+    expect(judge(data, "A", "B", F({ maxChainLen: 2 })).forward.some((x) => x.path.length === 2)).toBe(true);
+    expect(judge(data, "A", "B", F({ maxChainLen: 1 })).forward.length).toBe(0);
   });
   it("无路径给出提示", () => {
     const data = [s("X", "Y", 2, 0)];

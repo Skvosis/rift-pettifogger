@@ -6,10 +6,12 @@ export type Scope = "all" | "international" | "worlds";
 export type Tally = "series" | "game";
 /** 规则 id。 */
 export type RuleId = 1 | 2 | 3;
+/** 跨赛制（Bo3 vs Bo5）对比模式：关闭 / 仅零封＞打满（档位差=2）/ 全档位。 */
+export type CrossFormat = "off" | "strict" | "loose";
 
 /** 全局过滤器（用户可调，影响所有规则）。 */
 export interface Filters {
-  /** 起始日期 ISO（yyyy-mm-dd），null = 不限。 */
+  /** 起始日期 ISO（yyyy-mm-dd），null = 不限。默认最近三个月。 */
   start: string | null;
   /** 截止日期 ISO，null = 今天。 */
   end: string | null;
@@ -17,8 +19,10 @@ export interface Filters {
   tally: Tally;
   /** 规则 2 邻近窗口（天）。 */
   proximityDays: number;
-  /** 跨赛制严格模式（档位差必须 = 2）。 */
-  strict: boolean;
+  /** 跨赛制对比模式。 */
+  crossFormat: CrossFormat;
+  /** 传递链长度上限（边数）；7 = 不限（引擎硬上限）。 */
+  maxChainLen: number;
 }
 
 /** 一条 series 从某队视角的规范化证据视图。 */

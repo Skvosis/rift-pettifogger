@@ -13,7 +13,7 @@
     <div id="app">
       <header class="site-header">
         <h1>赢学联盟 <span class="en">Rift Pettifogger</span></h1>
-        <p class="tagline">输入 A 和 B，在真实战绩里找出「A 比 B 强」的论据链——本工具是辩护律师，不是法官。</p>
+        <p class="tagline">在真实比赛数据中检索战队间的论据链，生成带出处、可直接粘贴到论坛的论证文本。</p>
       </header>
 
       <main>
@@ -78,8 +78,22 @@
                 <label for="f-prox">邻近窗口（天）</label>
                 <input id="f-prox" type="number" min="1" value="90" />
               </div>
-              <div class="filter checkbox">
-                <label><input id="f-strict" type="checkbox" /> 跨赛制严格模式</label>
+              <div class="filter">
+                <label>跨赛制对比（Bo3 vs Bo5）</label>
+                <div class="segmented" data-name="xf">
+                  <button data-val="off">关闭</button>
+                  <button data-val="strict" class="active">仅零封＞打满</button>
+                  <button data-val="loose">全档位</button>
+                </div>
+              </div>
+              <div class="filter">
+                <label>传递链长度上限</label>
+                <div class="segmented" data-name="len">
+                  <button data-val="2">2</button>
+                  <button data-val="3" class="active">3</button>
+                  <button data-val="5">5</button>
+                  <button data-val="7">不限</button>
+                </div>
               </div>
             </div>
           </details>

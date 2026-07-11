@@ -277,7 +277,8 @@ function readFilters(): Filters {
   f.scope = activeSeg("scope") as Scope;
   f.tally = activeSeg("tally") as Tally;
   f.proximityDays = Number($<HTMLInputElement>("#f-prox").value) || 90;
-  f.strict = $<HTMLInputElement>("#f-strict").checked;
+  f.crossFormat = activeSeg("xf") as Filters["crossFormat"];
+  f.maxChainLen = Number(activeSeg("len")) || 3;
   return f;
 }
 
@@ -287,8 +288,19 @@ function writeFilters(f: Filters) {
   setSeg("scope", f.scope);
   setSeg("tally", f.tally);
   $<HTMLInputElement>("#f-prox").value = String(f.proximityDays);
-  $<HTMLInputElement>("#f-strict").checked = f.strict;
-  if (f.start || f.end || f.scope !== "all" || f.tally !== "series" || f.proximityDays !== 90 || f.strict) {
+  setSeg("xf", f.crossFormat);
+  setSeg("len", String(f.maxChainLen));
+  // 与默认值有差异时自动展开过滤器面板
+  const d = defaultFilters();
+  if (
+    f.start !== d.start ||
+    f.end !== d.end ||
+    f.scope !== d.scope ||
+    f.tally !== d.tally ||
+    f.proximityDays !== d.proximityDays ||
+    f.crossFormat !== d.crossFormat ||
+    f.maxChainLen !== d.maxChainLen
+  ) {
     $<HTMLDetailsElement>(".filters").open = true;
   }
 }
