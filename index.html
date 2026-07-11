@@ -8,6 +8,7 @@
       name="description"
       content="输入战队 A 和 B，在真实比赛数据中搜索「A 比 B 强」的论据链，一键生成带出处的论证文本。"
     />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   </head>
   <body>
     <div id="app">
@@ -16,7 +17,7 @@
           <button type="button" class="lang-btn" data-lang="zh" aria-label="中文">中</button>
           <button type="button" class="lang-btn" data-lang="en" aria-label="English">EN</button>
         </div>
-        <h1><span data-i18n="app.title">赢学联盟</span> <span class="en">Rift Pettifogger</span></h1>
+        <h1><span data-i18n="app.title">赢学联盟</span> <span class="en" data-i18n="app.subtitle">Rift Pettifogger</span></h1>
         <p class="tagline" data-i18n-html="tagline">
           你是一个云观众，你甚至记不清有哪些比赛……<br />
           但你真的很爱哥哥，今天却有人说滔博不如T1……<br />
@@ -77,11 +78,29 @@
             <div class="filter-grid">
               <div class="filter">
                 <label for="f-start" data-i18n="filter.start">起始时间</label>
-                <input id="f-start" type="date" />
+                <input
+                  id="f-start"
+                  type="text"
+                  inputmode="numeric"
+                  maxlength="10"
+                  spellcheck="false"
+                  autocomplete="off"
+                  data-i18n-placeholder="filter.datePlaceholder"
+                  placeholder="yyyy-mm-dd"
+                />
               </div>
               <div class="filter">
                 <label for="f-end" data-i18n="filter.end">截止时间</label>
-                <input id="f-end" type="date" />
+                <input
+                  id="f-end"
+                  type="text"
+                  inputmode="numeric"
+                  maxlength="10"
+                  spellcheck="false"
+                  autocomplete="off"
+                  data-i18n-placeholder="filter.datePlaceholder"
+                  placeholder="yyyy-mm-dd"
+                />
               </div>
               <div class="filter">
                 <label data-i18n="filter.scope">赛事范围</label>
@@ -111,13 +130,11 @@
                 </div>
               </div>
               <div class="filter">
-                <label data-i18n="filter.maxChainLen">传递链长度上限</label>
-                <div class="segmented" data-name="len">
-                  <button data-val="2">2</button>
-                  <button data-val="3" class="active">3</button>
-                  <button data-val="5">5</button>
-                  <button data-val="7" data-i18n="filter.unlimited">不限</button>
-                </div>
+                <label for="f-len" class="len-label">
+                  <span data-i18n="filter.maxChainLen">传递链长度上限</span>
+                  <output id="f-len-out" class="len-out">3</output>
+                </label>
+                <input id="f-len" type="range" min="1" max="6" step="1" value="3" />
               </div>
             </div>
           </details>

@@ -17,6 +17,10 @@ concurrency:
   group: scrape
   cancel-in-progress: false
 
+env:
+  # playwright 仅本地 UI 冒烟用，CI 不需要下载浏览器
+  PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+
 jobs:
   update-data:
     runs-on: ubuntu-latest

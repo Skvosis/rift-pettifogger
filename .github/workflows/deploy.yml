@@ -21,6 +21,10 @@ concurrency:
   group: pages
   cancel-in-progress: true
 
+env:
+  # playwright 仅本地 UI 冒烟用，CI 不需要下载浏览器
+  PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+
 jobs:
   build:
     # workflow_run 触发时仅在抓取成功后部署

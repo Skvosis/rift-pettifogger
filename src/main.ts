@@ -3,7 +3,7 @@ import { loadDataset, type Dataset } from "./data";
 import { resolveLogos } from "./logos";
 import type { Team } from "../shared/types";
 import type { Argument, Edge, Filters, Scope, SeriesEvidence, Tally, Verdict } from "./engine/types";
-import { defaultFilters, encodeState, decodeState, resolvedEnd } from "./engine/filters";
+import { CHAIN_LEN_UNLIMITED, defaultFilters, encodeState, decodeState, resolvedEnd } from "./engine/filters";
 import { judge } from "./engine/graph";
 import { findWinningFilters } from "./engine/mouthhard";
 import { verdictToText } from "./ui/copy";
@@ -128,6 +128,7 @@ function setupLangSwitch() {
 /** 语言切换后需要重新生成的动态内容（静态 data-i18n 元素已由 applyStaticTranslations 处理）。 */
 function onLocaleUpdated() {
   updateDataStatus();
+  updateLenOutput(); // 链长滑块的"不限"文案随语言切换
   if (!dataset) return; // 数据尚未加载完成
   regionGroups = groupByRegion(dataset.teams);
   // 打开中的选择面板内容按旧语言渲染，直接关闭；下次打开会用新语言重建
@@ -385,17 +386,53 @@ function setupFilters() {
       });
     });
   });
+  // 日期文本框：失焦时归一化（接受 2026/7/1、2026.7.1、2026年7月1日 等写法，非法则清空）
+  for (const id of ["#f-start", "#f-end"]) {
+    const input = $<HTMLInputElement>(id);
+    input.addEventListener("blur", () => {
+      input.value = parseDateInput(input.value) ?? "";
+    });
+  }
+  // 链长滑块：滑动时实时更新数值显示
+  $<HTMLInputElement>("#f-len").addEventListener("input", updateLenOutput);
+}
+
+/** 宽松解析日期输入 -> "yyyy-mm-dd"；无法解析返回 null。 */
+function parseDateInput(raw: string): string | null {
+  const v = raw
+    .trim()
+    .replace(/[/.年月]/g, "-")
+    .replace(/日/g, "")
+    .replace(/-+$/, "");
+  const m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(v);
+  if (!m) return null;
+  const [mo, d] = [Number(m[2]), Number(m[3])];
+  if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+  return `${m[1]}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}
+
+/** 滑块位置 1..6 ↔ 链长 1..5 / 不限（引擎值 7）。 */
+function lenFromSlider(pos: number): number {
+  return pos >= 6 ? CHAIN_LEN_UNLIMITED : Math.max(1, pos);
+}
+function sliderFromLen(len: number): number {
+  return len >= 6 ? 6 : len;
+}
+function updateLenOutput() {
+  const len = lenFromSlider(Number($<HTMLInputElement>("#f-len").value) || 3);
+  $<HTMLOutputElement>("#f-len-out").textContent =
+    len === CHAIN_LEN_UNLIMITED ? t("filter.unlimited") : String(len);
 }
 
 function readFilters(): Filters {
   const f = defaultFilters();
-  f.start = $<HTMLInputElement>("#f-start").value || null;
-  f.end = $<HTMLInputElement>("#f-end").value || null;
+  f.start = parseDateInput($<HTMLInputElement>("#f-start").value);
+  f.end = parseDateInput($<HTMLInputElement>("#f-end").value);
   f.scope = activeSeg("scope") as Scope;
   f.tally = activeSeg("tally") as Tally;
   f.proximityDays = Number($<HTMLInputElement>("#f-prox").value) || 90;
   f.crossFormat = activeSeg("xf") as Filters["crossFormat"];
-  f.maxChainLen = Number(activeSeg("len")) || 3;
+  f.maxChainLen = lenFromSlider(Number($<HTMLInputElement>("#f-len").value) || 3);
   return f;
 }
 
@@ -406,7 +443,8 @@ function writeFilters(f: Filters) {
   setSeg("tally", f.tally);
   $<HTMLInputElement>("#f-prox").value = String(f.proximityDays);
   setSeg("xf", f.crossFormat);
-  setSeg("len", String(f.maxChainLen));
+  $<HTMLInputElement>("#f-len").value = String(sliderFromLen(f.maxChainLen));
+  updateLenOutput();
   // 与默认值有差异时自动展开过滤器面板
   const d = defaultFilters();
   if (

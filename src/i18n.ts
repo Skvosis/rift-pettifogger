@@ -9,6 +9,7 @@ const zh: Dict = {
   "meta.title": "Rift Pettifogger · 赢学联盟 — LOL 战队论据生成器",
   "meta.description": "输入战队 A 和 B，在真实比赛数据中搜索「A 比 B 强」的论据链，一键生成带出处的论证文本。",
   "app.title": "赢学联盟",
+  "app.subtitle": "Rift Pettifogger",
   tagline:
     "你是一个云观众，你甚至记不清有哪些比赛……<br />但你真的很爱哥哥，今天却有人说滔博不如T1……<br />来吧，寻找哥哥更强的证据！",
 
@@ -23,6 +24,7 @@ const zh: Dict = {
   "filter.title": "全局过滤器",
   "filter.start": "起始时间",
   "filter.end": "截止时间",
+  "filter.datePlaceholder": "yyyy-mm-dd（留空=不限）",
   "filter.scope": "赛事范围",
   "filter.tally": "统计口径",
   "filter.proximity": "邻近窗口（天）",
@@ -165,7 +167,8 @@ const en: Dict = {
   "meta.title": "Rift Pettifogger · Winology League — LoL Team Argument Generator",
   "meta.description":
     "Pick Team A and B, and search real match data for evidence chains proving “A beats B” — generate sourced argument text with one click.",
-  "app.title": "Winology League",
+  "app.title": "Rift Pettifogger",
+  "app.subtitle": "Winology League",
   tagline:
     "You're a cloud-watcher who can barely remember which games happened…<br />But you truly love your bias — and today someone said Top Esports is worse than T1…<br />Come on, let's find proof your bias is better!",
 
@@ -180,6 +183,7 @@ const en: Dict = {
   "filter.title": "Global Filters",
   "filter.start": "Start date",
   "filter.end": "End date",
+  "filter.datePlaceholder": "yyyy-mm-dd (blank = no limit)",
   "filter.scope": "Tournament Scope",
   "filter.tally": "Tally",
   "filter.proximity": "Proximity Window (days)",

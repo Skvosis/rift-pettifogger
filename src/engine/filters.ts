@@ -57,7 +57,9 @@ export function decodeState(query: string): { a: string | null; b: string | null
   const xf = p.get("xf");
   if (xf && CROSS_FORMATS.includes(xf as CrossFormat)) f.crossFormat = xf as CrossFormat;
   const len = Number(p.get("len"));
-  if ([2, 3, 5, CHAIN_LEN_UNLIMITED].includes(len)) f.maxChainLen = len;
+  if (Number.isInteger(len) && ((len >= 1 && len <= 5) || len === CHAIN_LEN_UNLIMITED)) {
+    f.maxChainLen = len;
+  }
   const start = p.get("start");
   if (start === "none") f.start = null;
   else if (start && /^\d{4}-\d{2}-\d{2}$/.test(start)) f.start = start;
