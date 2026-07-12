@@ -34,6 +34,7 @@ interface Palette {
   border: string;
   accent: string;
   accentDeep: string;
+  accentSoft: string;
   win: string;
   seal: string;
 }
@@ -49,6 +50,7 @@ const PALETTES: Record<ThemeId, Palette> = {
     border: "#e4e4ea",
     accent: "#d8324e",
     accentDeep: "#7a0f22",
+    accentSoft: "#fce8ec",
     win: "#1f9d63",
     seal: "#d92b48",
   },
@@ -62,6 +64,7 @@ const PALETTES: Record<ThemeId, Palette> = {
     border: "#2a3040",
     accent: "#ff5872",
     accentDeep: "#c22743",
+    accentSoft: "#33161e",
     win: "#46c98a",
     seal: "#ff4d68",
   },
@@ -244,6 +247,46 @@ function scoreLineSegs(
   return segs;
 }
 
+/** 每张证据卡右侧的结论区宽度：竖排「甲 ＞ 乙」，扫一眼右列即得完整逻辑链。 */
+const ZONE_W = 240;
+
+function drawEdgeVerdict(
+  ctx: CanvasRenderingContext2D,
+  pal: Palette,
+  teams: Teams,
+  e: Edge,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+) {
+  const zx = x + w - ZONE_W - 18;
+  rr(ctx, zx, y + 12, ZONE_W, h - 24, 10);
+  ctx.fillStyle = pal.accentSoft;
+  ctx.globalAlpha = 0.6;
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  const cx = zx + ZONE_W / 2;
+  const cy = y + h / 2;
+  drawSegs(
+    ctx,
+    [{ text: teamName(teams, e.from), size: 23, weight: 800, color: pal.text }],
+    cx,
+    cy - 26,
+    { align: "center", maxW: ZONE_W - 20 },
+  );
+  drawSegs(ctx, [{ text: "＞", size: 30, weight: 800, color: pal.accent }], cx, cy + 9, {
+    align: "center",
+  });
+  drawSegs(
+    ctx,
+    [{ text: teamName(teams, e.to), size: 23, weight: 700, color: pal.muted }],
+    cx,
+    cy + 42,
+    { align: "center", maxW: ZONE_W - 20 },
+  );
+}
+
 function drawStep(
   ctx: CanvasRenderingContext2D,
   pal: Palette,
@@ -272,8 +315,11 @@ function drawStep(
   const num = String(idx + 1);
   ctx.fillText(num, x + 38 - ctx.measureText(num).width / 2, y + 46);
 
+  // 右侧结论区
+  drawEdgeVerdict(ctx, pal, teams, e, x, y, w, h);
+
   const x0 = x + 68;
-  const maxW = w - 92;
+  const maxW = w - 92 - ZONE_W - 26;
 
   if (e.evidence.kind === "rule1") {
     const ev = e.evidence.series;
@@ -443,7 +489,8 @@ async function renderCard(
   y += 28;
   const footY = y;
   const footBase = footY + 42;
-  const H = footY + 94;
+  // 盖章时底部加高：章落在页脚右侧空白，不压证据卡的结论区
+  const H = footY + (stamp ? 150 : 94);
 
   const canvas = document.createElement("canvas");
   canvas.width = W;
@@ -549,8 +596,8 @@ async function renderCard(
     { maxW: INNER - (stamp ? 190 : 0) },
   );
 
-  // ---- 方形章（可选，最后画，压在右下角） ----
-  if (stamp) drawSealSquare(ctx, pal, W - P - 88, footY - 14, 144);
+  // ---- 方形章（可选，落在页脚右侧空白） ----
+  if (stamp) drawSealSquare(ctx, pal, W - P - 88, footY + 58, 140);
 
   // 外框
   ctx.strokeStyle = pal.border;
