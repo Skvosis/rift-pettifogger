@@ -83,10 +83,9 @@ const zh: Dict = {
   "share.rendering": "生成中…",
   "share.copied": "图片已复制，去贴吧 / 群里粘贴吧",
   "share.copyFail": "复制失败，请改用下载",
-  "share.hint": "适合贴吧 / Reddit / 群聊直发",
 
   "img.evidence": "证 据",
-  "img.rule2Line": "共同对手：{via}",
+  "img.rule2Common": "共同对手：",
   "img.seal": "铁证如山",
   "img.credit": "by PlutoniumLink@bilibili",
 
@@ -265,10 +264,9 @@ const en: Dict = {
   "share.rendering": "Rendering…",
   "share.copied": "Image copied — paste it anywhere",
   "share.copyFail": "Copy failed — use Download instead",
-  "share.hint": "Ready for Reddit / forums / group chats",
 
   "img.evidence": "EVIDENCE",
-  "img.rule2Line": "Common opponent: {via}",
+  "img.rule2Common": "Common opponent: ",
   "img.seal": "FACT",
   "img.credit": "by PlutoniumLink@bilibili",
 

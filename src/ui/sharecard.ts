@@ -1,6 +1,7 @@
 // 分享图：把一条论据渲染成适合贴吧 / Reddit 传播的证据图 PNG。
 // 设计目标：单位面积信息量最大——大标题给结论（A ＞ B），正文全是可核验的
-// 比赛证据（比分/日期/赛事），额外元素只有站点地址与作者署名；方形章可选。
+// 比赛证据；战队一律用队标呈现（队名只在标题、传递链小字与共同对手处出现
+// 一次做锚点），额外元素只有站点地址与作者署名；方形章可选。
 // 纯 Canvas 2D 手绘，零运行时依赖；队标以 CORS 方式加载，失败退化为首字母
 // 头像，保证画布永不被污染、始终可导出。
 import type { Argument, Edge, SeriesEvidence } from "../engine/types";
@@ -175,6 +176,8 @@ async function loadLogos(ids: string[]): Promise<Map<string, HTMLImageElement>> 
   return out;
 }
 
+type Logos = Map<string, HTMLImageElement>;
+
 function drawLogo(
   ctx: CanvasRenderingContext2D,
   pal: Palette,
@@ -209,16 +212,36 @@ function drawLogo(
   }
 }
 
+/** 以某行文字基线为参照画队标（垂直对齐到文字视觉中心），返回队标宽度。 */
+function drawInlineLogo(
+  ctx: CanvasRenderingContext2D,
+  pal: Palette,
+  logos: Logos,
+  teams: Teams,
+  id: string,
+  x: number,
+  baseline: number,
+  textSize: number,
+  logoSize: number,
+): number {
+  const mid = baseline - textSize * 0.35;
+  drawLogo(ctx, pal, logos.get(id), teamName(teams, id), x, mid - logoSize / 2, logoSize);
+  return logoSize;
+}
+
 // ---------- 证据步骤 ----------
+/** 每张证据卡右侧的结论区宽度：「[队标] ＞ [队标]」，扫一眼右列即得完整逻辑链。 */
+const ZONE_W = 170;
+
 /** 规则 3 实际列出的场次数（证据优先，最多 3 场）。 */
 function rule3Lines(e: Edge): number {
   return e.evidence.kind === "rule3" ? Math.min(3, e.evidence.series.length) : 0;
 }
 
 function stepHeight(e: Edge): number {
-  if (e.evidence.kind === "rule2") return 172;
-  if (e.evidence.kind === "rule3") return 112 + 32 * rule3Lines(e);
-  return 112;
+  if (e.evidence.kind === "rule2") return 198;
+  if (e.evidence.kind === "rule3") return 128 + 42 * rule3Lines(e);
+  return 120;
 }
 
 function seriesMeta(ev: SeriesEvidence): string {
@@ -227,32 +250,43 @@ function seriesMeta(ev: SeriesEvidence): string {
   return parts.filter(Boolean).join(" · ");
 }
 
-/** 「名字 比分 名字」行：胜方比分绿色、败方与对手灰色。 */
-function scoreLineSegs(
-  teams: Teams,
+/** 「[队标] 比分 [队标] 日期」行：胜方比分绿色，队伍全用图标。 */
+function drawScoreRow(
+  ctx: CanvasRenderingContext2D,
   pal: Palette,
+  logos: Logos,
+  teams: Teams,
   ev: SeriesEvidence,
-  size: number,
-  withDate = false,
-): Seg[] {
+  x: number,
+  baseline: number,
+  scoreSize: number,
+  logoSize: number,
+  extra?: string,
+) {
   const won = ev.selfScore > ev.oppScore;
-  const segs: Seg[] = [
-    { text: teamName(teams, ev.self), size, weight: 800, color: pal.text },
-    { text: `  ${ev.selfScore}`, size, weight: 800, color: won ? pal.win : pal.muted },
-    { text: " : ", size: size - 4, weight: 700, color: pal.muted },
-    { text: `${ev.oppScore}  `, size, weight: 800, color: pal.muted },
-    { text: teamName(teams, ev.opp), size, weight: 600, color: pal.muted },
-  ];
-  if (withDate) segs.push({ text: `   ${ev.date.slice(5, 10)}`, size: size - 6, color: pal.muted });
-  return segs;
+  let cx = x;
+  cx += drawInlineLogo(ctx, pal, logos, teams, ev.self, cx, baseline, scoreSize, logoSize) + 14;
+  cx += drawSegs(
+    ctx,
+    [
+      { text: String(ev.selfScore), size: scoreSize, weight: 800, color: won ? pal.win : pal.muted },
+      { text: " : ", size: scoreSize - 4, weight: 700, color: pal.muted },
+      { text: String(ev.oppScore), size: scoreSize, weight: 800, color: pal.muted },
+    ],
+    cx,
+    baseline,
+  );
+  cx += 14;
+  cx += drawInlineLogo(ctx, pal, logos, teams, ev.opp, cx, baseline, scoreSize, logoSize);
+  if (extra) {
+    drawSegs(ctx, [{ text: extra, size: scoreSize - 8, color: pal.muted }], cx + 16, baseline);
+  }
 }
-
-/** 每张证据卡右侧的结论区宽度：竖排「甲 ＞ 乙」，扫一眼右列即得完整逻辑链。 */
-const ZONE_W = 240;
 
 function drawEdgeVerdict(
   ctx: CanvasRenderingContext2D,
   pal: Palette,
+  logos: Logos,
   teams: Teams,
   e: Edge,
   x: number,
@@ -266,30 +300,25 @@ function drawEdgeVerdict(
   ctx.globalAlpha = 0.6;
   ctx.fill();
   ctx.globalAlpha = 1;
-  const cx = zx + ZONE_W / 2;
   const cy = y + h / 2;
-  drawSegs(
-    ctx,
-    [{ text: teamName(teams, e.from), size: 23, weight: 800, color: pal.text }],
-    cx,
-    cy - 26,
-    { align: "center", maxW: ZONE_W - 20 },
-  );
-  drawSegs(ctx, [{ text: "＞", size: 30, weight: 800, color: pal.accent }], cx, cy + 9, {
-    align: "center",
-  });
-  drawSegs(
-    ctx,
-    [{ text: teamName(teams, e.to), size: 23, weight: 700, color: pal.muted }],
-    cx,
-    cy + 42,
-    { align: "center", maxW: ZONE_W - 20 },
-  );
+  const logoSize = 46;
+  ctx.font = font(800, 30);
+  const gtW = ctx.measureText("＞").width;
+  const total = logoSize * 2 + gtW + 32;
+  let cx = zx + (ZONE_W - total) / 2;
+  drawLogo(ctx, pal, logos.get(e.from), teamName(teams, e.from), cx, cy - logoSize / 2, logoSize);
+  cx += logoSize + 16;
+  ctx.fillStyle = pal.accent;
+  ctx.font = font(800, 30);
+  ctx.fillText("＞", cx, cy + 11);
+  cx += gtW + 16;
+  drawLogo(ctx, pal, logos.get(e.to), teamName(teams, e.to), cx, cy - logoSize / 2, logoSize);
 }
 
 function drawStep(
   ctx: CanvasRenderingContext2D,
   pal: Palette,
+  logos: Logos,
   teams: Teams,
   e: Edge,
   idx: number,
@@ -316,55 +345,65 @@ function drawStep(
   ctx.fillText(num, x + 38 - ctx.measureText(num).width / 2, y + 46);
 
   // 右侧结论区
-  drawEdgeVerdict(ctx, pal, teams, e, x, y, w, h);
+  drawEdgeVerdict(ctx, pal, logos, teams, e, x, y, w, h);
 
   const x0 = x + 68;
   const maxW = w - 92 - ZONE_W - 26;
 
   if (e.evidence.kind === "rule1") {
     const ev = e.evidence.series;
-    drawSegs(ctx, scoreLineSegs(teams, pal, ev, 30), x0, y + 50, { maxW });
+    drawScoreRow(ctx, pal, logos, teams, ev, x0, y + 58, 30, 40);
     drawSegs(
       ctx,
       [{ text: `${seriesMeta(ev)} · ${ruleName(1)}`, size: 20, color: pal.muted }],
       x0,
-      y + 86,
+      y + 96,
       { maxW },
     );
   } else if (e.evidence.kind === "rule2") {
     const ev = e.evidence;
+    // 标题：共同对手 [队标] 队名（第三方队伍在此点名一次，后续行只认图标）
+    let cx = x0;
+    cx += drawSegs(
+      ctx,
+      [{ text: t("img.rule2Common"), size: 23, weight: 700, color: pal.text }],
+      cx,
+      y + 46,
+    );
+    cx += drawInlineLogo(ctx, pal, logos, teams, ev.via, cx + 4, y + 46, 23, 30) + 12;
     drawSegs(
       ctx,
-      [{ text: t("img.rule2Line", { via: teamName(teams, ev.via) }), size: 23, weight: 700, color: pal.text }],
-      x0,
+      [{ text: teamName(teams, ev.via), size: 23, weight: 700, color: pal.text }],
+      cx + 2,
       y + 46,
-      { maxW },
+      { maxW: maxW - (cx - x0) },
     );
-    drawSegs(ctx, scoreLineSegs(teams, pal, ev.aSeries, 25, true), x0, y + 82, { maxW });
-    drawSegs(ctx, scoreLineSegs(teams, pal, ev.bSeries, 25, true), x0, y + 116, { maxW });
+    drawScoreRow(ctx, pal, logos, teams, ev.aSeries, x0, y + 94, 26, 36, ev.aSeries.date.slice(5, 10));
+    drawScoreRow(ctx, pal, logos, teams, ev.bSeries, x0, y + 142, 26, 36, ev.bSeries.date.slice(5, 10));
     drawSegs(
       ctx,
       [{ text: `→ ${formatRule2Note(ev.note)}`, size: 20, weight: 600, color: pal.accent }],
       x0,
-      y + 148,
+      y + 176,
       { maxW },
     );
   } else {
     const ev = e.evidence;
     const losses = ev.total - ev.wins;
-    drawSegs(
+    // 总战绩行：[队标] 5 - 1 [队标]
+    let cx = x0;
+    cx += drawInlineLogo(ctx, pal, logos, teams, e.from, cx, y + 58, 30, 40) + 14;
+    cx += drawSegs(
       ctx,
       [
-        { text: teamName(teams, e.from), size: 30, weight: 800, color: pal.text },
-        { text: `  ${ev.wins}`, size: 30, weight: 800, color: pal.win },
+        { text: String(ev.wins), size: 30, weight: 800, color: pal.win },
         { text: " - ", size: 26, weight: 700, color: pal.muted },
-        { text: `${losses}  `, size: 30, weight: 800, color: pal.muted },
-        { text: teamName(teams, e.to), size: 30, weight: 600, color: pal.muted },
+        { text: String(losses), size: 30, weight: 800, color: pal.muted },
       ],
-      x0,
-      y + 50,
-      { maxW },
+      cx,
+      y + 58,
     );
+    drawInlineLogo(ctx, pal, logos, teams, e.to, cx + 14, y + 58, 30, 40);
     const scopeNote = ev.downgraded ? t("link.rule3ScopeNote", { scope: scopeLabel(ev.scopeUsed) }) : "";
     const more = ev.series.length > 3 ? ` ${tc("link.moreMatches", ev.series.length)}` : "";
     drawSegs(
@@ -385,15 +424,14 @@ function drawStep(
         },
       ],
       x0,
-      y + 86,
+      y + 96,
       { maxW },
     );
     // 实际场次：证据本体，尽量多列
     ev.series.slice(0, 3).forEach((s, i) => {
-      const segs = scoreLineSegs(teams, pal, s, 22, true);
       const lg = leagueLabel(s.league);
-      if (lg) segs.push({ text: ` · ${lg}`, size: 18, color: pal.muted });
-      drawSegs(ctx, segs, x0, y + 118 + 32 * i, { maxW });
+      const extra = s.date.slice(5, 10) + (lg ? ` · ${lg}` : "");
+      drawScoreRow(ctx, pal, logos, teams, s, x0, y + 136 + 42 * i, 22, 32, extra);
     });
   }
 }
@@ -450,6 +488,19 @@ const W = 1080;
 const P = 64;
 const INNER = W - P * 2;
 
+/** 一条边涉及的所有队伍 id（结论双方 + 证据里的对手）。 */
+function edgeTeamIds(e: Edge): string[] {
+  const ids = [e.from, e.to];
+  if (e.evidence.kind === "rule1") {
+    ids.push(e.evidence.series.self, e.evidence.series.opp);
+  } else if (e.evidence.kind === "rule2") {
+    ids.push(e.evidence.via, e.evidence.aSeries.self, e.evidence.aSeries.opp, e.evidence.bSeries.self, e.evidence.bSeries.opp);
+  } else {
+    for (const s of e.evidence.series.slice(0, 3)) ids.push(s.self, s.opp);
+  }
+  return ids;
+}
+
 async function renderCard(
   o: ShareImageOptions,
   startId: string,
@@ -461,7 +512,9 @@ async function renderCard(
   const teams = o.teams;
   const path = o.arg.path;
   const multi = path.length > 1;
-  const logos = await loadLogos([startId, endId]);
+  const logoIds = new Set<string>([startId, endId]);
+  for (const e of path) for (const id of edgeTeamIds(e)) logoIds.add(id);
+  const logos = await loadLogos([...logoIds]);
   const aName = teamName(teams, startId);
   const bName = teamName(teams, endId);
 
@@ -470,11 +523,11 @@ async function renderCard(
   y += 30;
   const claimCY = y + 54;
   y += 112;
-  let routeY = 0;
+  let routeTop = 0;
   if (multi) {
-    y += 34;
-    routeY = y;
-    y += 6;
+    y += 10;
+    routeTop = y;
+    y += 70;
   }
   y += 28;
   const sectionY = y + 14;
@@ -512,7 +565,7 @@ async function renderCard(
   ctx.fillStyle = bar;
   ctx.fillRect(0, 0, W, 10);
 
-  // ---- 主张行：logo A ＞ B logo ----
+  // ---- 主张行：logo A ＞ B logo（队名仅在此出现，为下方图标做锚点） ----
   const logoSize = 88;
   const logoGap = 20;
   const claimSegs: Seg[] = [
@@ -538,16 +591,40 @@ async function renderCard(
     drawLogo(ctx, pal, logos.get(endId), bName, left + groupW - logoSize, claimCY - logoSize / 2, logoSize);
   }
 
-  // ---- 传递链示意（多跳时）：A ＞ C ＞ B ----
+  // ---- 传递链示意（多跳时）：[队标] ＞ [队标] ＞ [队标]，小字队名做图例 ----
   if (multi) {
-    const segs: Seg[] = [];
     const ids = [path[0].from, ...path.map((e) => e.to)];
+    const chipW = 84;
+    const chipLogo = 44;
+    ctx.font = font(800, 26);
+    const sepW = ctx.measureText("＞").width + 24;
+    const total = ids.length * chipW + (ids.length - 1) * sepW;
+    let cx = (W - total) / 2;
     ids.forEach((id, i) => {
-      if (i > 0) segs.push({ text: " ＞ ", size: 24, weight: 800, color: pal.accent });
-      const color = i === 0 ? pal.accent : i === ids.length - 1 ? pal.muted : pal.text;
-      segs.push({ text: teamName(teams, id), size: 24, weight: 700, color });
+      if (i > 0) {
+        ctx.fillStyle = pal.accent;
+        ctx.font = font(800, 26);
+        ctx.fillText("＞", cx + 12, routeTop + chipLogo / 2 + 9);
+        cx += sepW;
+      }
+      drawLogo(
+        ctx,
+        pal,
+        logos.get(id),
+        teamName(teams, id),
+        cx + (chipW - chipLogo) / 2,
+        routeTop,
+        chipLogo,
+      );
+      drawSegs(
+        ctx,
+        [{ text: teamName(teams, id), size: 13, weight: 600, color: pal.muted }],
+        cx + chipW / 2,
+        routeTop + chipLogo + 18,
+        { align: "center", maxW: chipW + 8 },
+      );
+      cx += chipW;
     });
-    drawSegs(ctx, segs, W / 2, routeY, { align: "center", maxW: INNER });
   }
 
   // ---- 证据标题 ----
@@ -573,7 +650,7 @@ async function renderCard(
   // ---- 证据步骤 ----
   path.forEach((e, i) => {
     if (i > 0) drawConnector(ctx, pal, W / 2, stepYs[i - 1].y + stepYs[i - 1].h, stepYs[i].y);
-    drawStep(ctx, pal, teams, e, i, P, stepYs[i].y, INNER);
+    drawStep(ctx, pal, logos, teams, e, i, P, stepYs[i].y, INNER);
   });
 
   // ---- 页脚：只有地址 + 署名 ----
@@ -682,7 +759,6 @@ export function openShareImage(o: ShareImageOptions): void {
     copyBtn.disabled = true;
     actions.append(copyBtn);
   }
-  actions.append(el("span", "share-hint", t("share.hint")));
   dialog.append(actions);
 
   async function render() {

@@ -692,11 +692,6 @@ body {
   border-top: 1px solid var(--border);
   flex-wrap: wrap;
 }
-.share-hint {
-  margin-left: auto;
-  font-size: 11.5px;
-  color: var(--muted);
-}
 
 /* ---------- 链条（水平） ---------- */
 .chain-row {
