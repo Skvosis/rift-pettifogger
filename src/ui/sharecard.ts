@@ -453,40 +453,39 @@ function drawConnector(ctx: CanvasRenderingContext2D, pal: Palette, cx: number, 
   ctx.fill();
 }
 
-// ---------- 方形章（2×2 四字：铁证/如山，英文 FA/CT） ----------
-function drawSealSquare(ctx: CanvasRenderingContext2D, pal: Palette, cx: number, cy: number, size: number) {
-  const chars = [...t("img.seal")].slice(0, 4);
+// ---------- 单行章：斜置双框「铁证如山」/「FACT」 ----------
+function drawStamp(ctx: CanvasRenderingContext2D, pal: Palette, cx: number, cy: number) {
+  const text = t("img.seal");
   ctx.save();
   ctx.translate(cx, cy);
-  ctx.rotate(-0.1);
+  ctx.rotate(-0.08);
   ctx.globalAlpha = 0.82;
+  ctx.font = font(800, 40, true);
+  setSpacing(ctx, 5);
+  const w = ctx.measureText(text).width + 52;
+  const h = 74;
   ctx.strokeStyle = pal.seal;
-  ctx.fillStyle = pal.seal;
-  const half = size / 2;
-  ctx.lineWidth = 7;
-  rr(ctx, -half, -half, size, size, 6);
+  ctx.lineWidth = 5;
+  rr(ctx, -w / 2, -h / 2, w, h, 9);
   ctx.stroke();
   ctx.lineWidth = 2;
-  rr(ctx, -half + 9, -half + 9, size - 18, size - 18, 3);
+  rr(ctx, -w / 2 + 7, -h / 2 + 7, w - 14, h - 14, 5);
   ctx.stroke();
-  ctx.font = font(800, size * 0.32, true);
+  ctx.fillStyle = pal.seal;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  const q = size / 4;
-  const pos: [number, number][] = [
-    [-q, -q],
-    [q, -q],
-    [-q, q],
-    [q, q],
-  ];
-  chars.forEach((ch, i) => ctx.fillText(ch, pos[i][0], pos[i][1] + 2));
+  ctx.fillText(text, 0, 3);
+  setSpacing(ctx, 0);
   ctx.restore();
 }
 
 // ---------- 整图渲染 ----------
 const W = 1080;
-const P = 64;
-const INNER = W - P * 2;
+/** 全局放大：逻辑坐标按 1.18 倍渲染到 1080px 宽画布，边距收窄，内容更大、留白更少。 */
+const SCALE = 1.18;
+const LW = W / SCALE;
+const P = 34;
+const INNER = LW - P * 2;
 
 /** 一条边涉及的所有队伍 id（结论双方 + 证据里的对手）。 */
 function edgeTeamIds(e: Edge): string[] {
@@ -518,52 +517,53 @@ async function renderCard(
   const aName = teamName(teams, startId);
   const bName = teamName(teams, endId);
 
-  // ---- 布局（无折行，全部整行缩放，高度可精确预算） ----
-  let y = 10;
-  y += 30;
-  const claimCY = y + 54;
-  y += 112;
+  // ---- 布局（无折行，全部整行缩放，高度可精确预算；逻辑坐标系） ----
+  let y = 9;
+  y += 24;
+  const claimCY = y + 50;
+  y += 104;
   let routeTop = 0;
   if (multi) {
-    y += 10;
+    y += 8;
     routeTop = y;
-    y += 70;
+    y += 66;
   }
-  y += 28;
-  const sectionY = y + 14;
-  y = sectionY + 30;
+  y += 22;
+  const sectionY = y + 12;
+  y = sectionY + 26;
   const stepYs: { y: number; h: number }[] = [];
   for (let i = 0; i < path.length; i++) {
-    if (i > 0) y += 28;
+    if (i > 0) y += 24;
     const h = stepHeight(path[i]);
     stepYs.push({ y, h });
     y += h;
   }
-  y += 28;
+  y += 24;
   const footY = y;
-  const footBase = footY + 42;
-  // 盖章时底部加高：章落在页脚右侧空白，不压证据卡的结论区
-  const H = footY + (stamp ? 150 : 94);
+  const footBase = footY + 38;
+  // 盖章时底部略加高：章落在页脚右侧空白，不压证据卡的结论区
+  const H = footY + (stamp ? 118 : 82);
 
   const canvas = document.createElement("canvas");
   canvas.width = W;
-  canvas.height = H;
+  canvas.height = Math.round(H * SCALE);
   const ctx = canvas.getContext("2d")!;
+  ctx.scale(SCALE, SCALE);
   ctx.textBaseline = "alphabetic";
 
   // ---- 背景 ----
   ctx.fillStyle = pal.bg;
-  ctx.fillRect(0, 0, W, H);
-  const glow = ctx.createRadialGradient(W / 2, -80, 60, W / 2, -80, 640);
+  ctx.fillRect(0, 0, LW, H);
+  const glow = ctx.createRadialGradient(LW / 2, -70, 50, LW / 2, -70, 560);
   glow.addColorStop(0, pal.glow);
   glow.addColorStop(1, "rgba(0,0,0,0)");
   ctx.fillStyle = glow;
-  ctx.fillRect(0, 0, W, 420);
-  const bar = ctx.createLinearGradient(0, 0, W, 0);
+  ctx.fillRect(0, 0, LW, 380);
+  const bar = ctx.createLinearGradient(0, 0, LW, 0);
   bar.addColorStop(0, pal.accent);
   bar.addColorStop(1, pal.accentDeep);
   ctx.fillStyle = bar;
-  ctx.fillRect(0, 0, W, 10);
+  ctx.fillRect(0, 0, LW, 9);
 
   // ---- 主张行：logo A ＞ B logo（队名仅在此出现，为下方图标做锚点） ----
   const logoSize = 88;
@@ -580,7 +580,7 @@ async function renderCard(
     if (w0 > maxTextW) scale = Math.max(0.4, maxTextW / w0);
     const textW = segsWidth(ctx, claimSegs, scale);
     const groupW = textW + 2 * (logoSize + logoGap);
-    const left = (W - groupW) / 2;
+    const left = (LW - groupW) / 2;
     drawLogo(ctx, pal, logos.get(startId), aName, left, claimCY - logoSize / 2, logoSize);
     drawSegs(
       ctx,
@@ -599,7 +599,7 @@ async function renderCard(
     ctx.font = font(800, 26);
     const sepW = ctx.measureText("＞").width + 24;
     const total = ids.length * chipW + (ids.length - 1) * sepW;
-    let cx = (W - total) / 2;
+    let cx = (LW - total) / 2;
     ids.forEach((id, i) => {
       if (i > 0) {
         ctx.fillStyle = pal.accent;
@@ -637,19 +637,19 @@ async function renderCard(
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.moveTo(P, sectionY - 7);
-  ctx.lineTo(W / 2 - secW / 2 - 16, sectionY - 7);
-  ctx.moveTo(W / 2 + secW / 2 + 16, sectionY - 7);
-  ctx.lineTo(W - P, sectionY - 7);
+  ctx.lineTo(LW / 2 - secW / 2 - 16, sectionY - 7);
+  ctx.moveTo(LW / 2 + secW / 2 + 16, sectionY - 7);
+  ctx.lineTo(LW - P, sectionY - 7);
   ctx.stroke();
   setSpacing(ctx, 6);
-  drawSegs(ctx, [{ text: secText, size: 19, weight: 700, color: pal.muted }], W / 2, sectionY, {
+  drawSegs(ctx, [{ text: secText, size: 19, weight: 700, color: pal.muted }], LW / 2, sectionY, {
     align: "center",
   });
   setSpacing(ctx, 0);
 
   // ---- 证据步骤 ----
   path.forEach((e, i) => {
-    if (i > 0) drawConnector(ctx, pal, W / 2, stepYs[i - 1].y + stepYs[i - 1].h, stepYs[i].y);
+    if (i > 0) drawConnector(ctx, pal, LW / 2, stepYs[i - 1].y + stepYs[i - 1].h, stepYs[i].y);
     drawStep(ctx, pal, logos, teams, e, i, P, stepYs[i].y, INNER);
   });
 
@@ -658,7 +658,7 @@ async function renderCard(
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.moveTo(P, footY);
-  ctx.lineTo(W - P, footY);
+  ctx.lineTo(LW - P, footY);
   ctx.stroke();
   const url = (location.host + location.pathname).replace(/\/$/, "");
   drawSegs(
@@ -670,16 +670,17 @@ async function renderCard(
     ],
     P,
     footBase,
-    { maxW: INNER - (stamp ? 190 : 0) },
+    { maxW: INNER - (stamp ? 290 : 0) },
   );
 
-  // ---- 方形章（可选，落在页脚右侧空白） ----
-  if (stamp) drawSealSquare(ctx, pal, W - P - 88, footY + 58, 140);
+  // ---- 单行章（可选，落在页脚右侧空白） ----
+  if (stamp) drawStamp(ctx, pal, LW - P - 148, footY + 40);
 
-  // 外框
+  // 外框（设备坐标，保证 1px 干净描边）
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.strokeStyle = pal.border;
   ctx.lineWidth = 2;
-  ctx.strokeRect(1, 1, W - 2, H - 2);
+  ctx.strokeRect(1, 1, canvas.width - 2, canvas.height - 2);
 
   return canvas;
 }
