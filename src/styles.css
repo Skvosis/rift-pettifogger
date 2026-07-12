@@ -579,6 +579,108 @@ body {
   background: var(--defense-soft);
   color: var(--defense);
 }
+.arg-img-btn {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 2px 9px;
+  cursor: pointer;
+  transition: all 0.12s;
+  white-space: nowrap;
+}
+.arg-img-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* ---------- 分享判决图弹窗 ---------- */
+.share-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 10, 16, 0.55);
+  backdrop-filter: blur(3px);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.share-dialog {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  width: min(560px, 94vw);
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.share-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.share-head h3 {
+  margin: 0;
+  font-size: 15px;
+  flex: 1;
+}
+.share-close {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  line-height: 1;
+}
+.share-close:hover {
+  color: var(--text);
+  background: var(--card-2);
+}
+.share-preview {
+  overflow: auto;
+  padding: 16px;
+  background: var(--card-2);
+  flex: 1;
+  min-height: 120px;
+  text-align: center;
+}
+.share-preview canvas {
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  display: block;
+}
+.share-status {
+  margin: 40px 0;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+.share-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 16px;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.share-hint {
+  margin-left: auto;
+  font-size: 11.5px;
+  color: var(--muted);
+}
 
 /* ---------- 链条（水平） ---------- */
 .chain-row {

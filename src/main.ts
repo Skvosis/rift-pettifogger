@@ -7,6 +7,7 @@ import { CHAIN_LEN_UNLIMITED, defaultFilters, encodeState, decodeState, resolved
 import { judge } from "./engine/graph";
 import { findWinningFilters } from "./engine/mouthhard";
 import { verdictToText } from "./ui/copy";
+import { openShareImage } from "./ui/sharecard";
 import {
   argKind,
   formatFilterChange,
@@ -253,7 +254,8 @@ function logoEl(teamId: string, display: string): HTMLElement {
 }
 
 function logoImg(url: string): HTMLElement {
-  const img = h("img", { src: url, alt: "", loading: "lazy" } as any);
+  // Fandom CDN 对带 Referer 的热链返回 404 占位图，必须以 no-referrer 请求
+  const img = h("img", { src: url, alt: "", loading: "lazy", referrerPolicy: "no-referrer" } as any);
   img.className = "team-logo img";
   return img;
 }
@@ -552,10 +554,15 @@ function renderArgList(args: Argument[], variant: "forward" | "reverse"): HTMLEl
 function renderArg(arg: Argument): HTMLElement {
   const card = h("div", { class: "arg-card" });
   const score = (arg.chainStrength * 100).toFixed(0);
+  const imgBtn = h("button", { class: "arg-img-btn" }, [t("arg.image")]);
+  imgBtn.addEventListener("click", () =>
+    openShareImage({ teams: dataset.teamById, arg, filters: lastFilters, toast }),
+  );
   card.append(
     h("div", { class: "arg-head" }, [
       h("span", { class: "arg-kind" }, [argKind(arg.path)]),
       h("span", { class: "arg-score", title: t("arg.scoreTooltip") }, [t("arg.score", { score })]),
+      imgBtn,
     ]),
   );
   const chain = h("div", { class: "chain-row" });
