@@ -555,9 +555,7 @@ function renderArg(arg: Argument): HTMLElement {
   const card = h("div", { class: "arg-card" });
   const score = (arg.chainStrength * 100).toFixed(0);
   const imgBtn = h("button", { class: "arg-img-btn" }, [t("arg.image")]);
-  imgBtn.addEventListener("click", () =>
-    openShareImage({ teams: dataset.teamById, arg, filters: lastFilters, toast }),
-  );
+  imgBtn.addEventListener("click", () => openShareImage({ teams: dataset.teamById, arg, toast }));
   card.append(
     h("div", { class: "arg-head" }, [
       h("span", { class: "arg-kind" }, [argKind(arg.path)]),
