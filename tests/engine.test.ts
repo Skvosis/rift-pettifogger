@@ -206,6 +206,28 @@ describe("图搜索与判案", () => {
     expect(judge(data, "A", "B", F({ maxChainLen: 2 })).forward.some((x) => x.path.length === 2)).toBe(true);
     expect(judge(data, "A", "B", F({ maxChainLen: 1 })).forward.length).toBe(0);
   });
+  it("规则 2 计为 2 层：链长上限 1 排除，2 纳入；折扣按有效层数", () => {
+    // A 2-0 胜 C，B 2-1 胜 C -> 规则 2 直接边 A>B（有效层数 2）
+    const data = [s("A", "C", 2, 0), s("B", "C", 2, 1)];
+    expect(judge(data, "A", "B", F({ maxChainLen: 1 })).forward.length).toBe(0);
+    const v2 = judge(data, "A", "B", F({ maxChainLen: 2 }));
+    expect(v2.forward.length).toBe(1);
+    // 得分含一次链衰减：等于边强度 × chainDecay
+    const e = v2.forward[0].path[0];
+    expect(v2.forward[0].chainStrength).toBeCloseTo(e.strength * 0.7, 10);
+  });
+  it("规则1+规则2 两环链有效层数为 3", () => {
+    // A -规则1-> X（X 直接输给 A），X 与 B 经共同对手 C 比较 -> X>B
+    const data = [
+      s("A", "X", 2, 0, { date: "2024-06-01" }),
+      s("X", "C", 2, 0, { date: "2024-05-01" }),
+      s("B", "C", 2, 1, { date: "2024-05-02" }),
+    ];
+    const hit = (len: number) =>
+      judge(data, "A", "B", F({ maxChainLen: len })).forward.some((x) => x.path.length === 2);
+    expect(hit(2)).toBe(false); // 有效层 3 > 上限 2
+    expect(hit(3)).toBe(true);
+  });
   it("无路径给出提示", () => {
     const data = [s("X", "Y", 2, 0)];
     const v = judge(data, "X", "Y", F());

@@ -88,8 +88,9 @@ export function findArguments(
   maxResults = MAX_RESULTS,
   maxDepth = MAX_DEPTH,
 ): Argument[] {
-  // 直接边：每条规则各作为一条 length-1 论证
-  const direct = edges.filter((e) => e.from === a && e.to === b);
+  const depthCapEff = clampDepth(maxDepth) === MAX_DEPTH ? MAX_DEPTH * 2 : clampDepth(maxDepth);
+  // 直接边：每条规则各作为一条论证（规则 2 计 2 层，受链长上限约束）
+  const direct = edges.filter((e) => e.from === a && e.to === b && edgeLayers(e) <= depthCapEff);
   const args: Argument[] = direct.map((e) => ({ path: [e], chainStrength: chainScore([e]) }));
 
   // 传递链：每个有向对取最强边建简单图
@@ -102,18 +103,20 @@ export function findArguments(
   const adj = new Map<string, Edge[]>();
   for (const e of best.values()) push(adj, e.from, e);
 
-  // 迭代 DFS 枚举简单路径（长度 ≥ 2），按扩展数封顶
-  const depthCap = clampDepth(maxDepth);
+  // 迭代 DFS 枚举简单路径（长度 ≥ 2），按扩展数封顶；
+  // 层数上限按"有效层"计（规则 2 记 2 层），物理边数始终受引擎硬上限约束
   let expansions = 0;
-  const stack: { node: string; path: Edge[]; visited: Set<string> }[] = [
-    { node: a, path: [], visited: new Set([a]) },
+  const stack: { node: string; path: Edge[]; visited: Set<string>; layers: number }[] = [
+    { node: a, path: [], visited: new Set([a]), layers: 0 },
   ];
   while (stack.length && args.length < maxResults && expansions < MAX_EXPANSIONS) {
-    const { node, path, visited } = stack.pop()!;
-    if (path.length >= depthCap) continue;
+    const { node, path, visited, layers } = stack.pop()!;
+    if (path.length >= MAX_DEPTH) continue;
     for (const e of adj.get(node) ?? []) {
       expansions++;
       if (visited.has(e.to)) continue;
+      const nextLayers = layers + edgeLayers(e);
+      if (nextLayers > depthCapEff) continue;
       const nextPath = [...path, e];
       if (e.to === b) {
         if (nextPath.length >= 2) {
@@ -123,7 +126,7 @@ export function findArguments(
       }
       const nextVisited = new Set(visited);
       nextVisited.add(e.to);
-      stack.push({ node: e.to, path: nextPath, visited: nextVisited });
+      stack.push({ node: e.to, path: nextPath, visited: nextVisited, layers: nextLayers });
     }
   }
 
@@ -132,10 +135,16 @@ export function findArguments(
   return args;
 }
 
-/** 链条得分 = 最弱一环的含金量 × 每多一环的折扣（长链天然弱于短链，但强链可胜过弱的短链）。 */
+/** 单边的有效层数：规则 2 借道共同对手做小分对比，视作额外经过一层传递。 */
+function edgeLayers(e: Edge): number {
+  return e.rule === 2 ? 2 : 1;
+}
+
+/** 链条得分 = 最弱一环的含金量 × 每多一有效层的折扣（长链天然弱于短链，但强链可胜过弱的短链）。 */
 function chainScore(path: Edge[]): number {
   const minQ = path.reduce((m, e) => Math.min(m, e.strength), Infinity);
-  return minQ * Math.pow(QUALITY.chainDecay, path.length - 1);
+  const layers = path.reduce((sum, e) => sum + edgeLayers(e), 0);
+  return minQ * Math.pow(QUALITY.chainDecay, layers - 1);
 }
 
 /** 正方无路径时，给出最可能有戏的放宽建议（结构化，UI 层用 i18n 格式化）。 */
