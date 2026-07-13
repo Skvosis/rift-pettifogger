@@ -2,6 +2,7 @@
 import type { Series } from "../../shared/types";
 import type { CrossFormat, Filters, FilterChange, Scope, Tally } from "./types";
 import { buildEdges, findArguments } from "./graph";
+import { CHAIN_LEN_UNLIMITED } from "./filters";
 
 export interface Suggestion {
   filters: Filters;
@@ -18,7 +19,7 @@ export interface Suggestion {
 const SCOPES: Scope[] = ["all", "international", "worlds"];
 const TALLIES: Tally[] = ["series", "game"];
 const PROXES = [90, 365, 3650];
-const CHAIN_LENS = [3, 5, 7];
+const CHAIN_LENS = [5, 8, CHAIN_LEN_UNLIMITED];
 
 /** 搜索让 A>B 成立的过滤器组合。base 为用户当前设置。 */
 export function findWinningFilters(

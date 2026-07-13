@@ -21,7 +21,7 @@ export interface Filters {
   proximityDays: number;
   /** 跨赛制对比模式。 */
   crossFormat: CrossFormat;
-  /** 传递链长度上限（边数）；7 = 不限（引擎硬上限）。 */
+  /** 传递链有效层数上限（规则 2 计 2 层，其余计 1 层）：1–8 为真实档位；不限见 `CHAIN_LEN_UNLIMITED`。 */
   maxChainLen: number;
 }
 

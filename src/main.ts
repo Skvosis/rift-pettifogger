@@ -413,15 +413,15 @@ function parseDateInput(raw: string): string | null {
   return `${m[1]}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 }
 
-/** 滑块位置 1..6 ↔ 链长 1..5 / 不限（引擎值 7）。 */
+/** 滑块位置 1..9 ↔ 链长 1..8 / 不限（第 9 档，引擎哨兵值）。 */
 function lenFromSlider(pos: number): number {
-  return pos >= 6 ? CHAIN_LEN_UNLIMITED : Math.max(1, pos);
+  return pos >= 9 ? CHAIN_LEN_UNLIMITED : Math.max(1, pos);
 }
 function sliderFromLen(len: number): number {
-  return len >= 6 ? 6 : len;
+  return len >= 9 ? 9 : len;
 }
 function updateLenOutput() {
-  const len = lenFromSlider(Number($<HTMLInputElement>("#f-len").value) || 3);
+  const len = lenFromSlider(Number($<HTMLInputElement>("#f-len").value) || 5);
   $<HTMLOutputElement>("#f-len-out").textContent =
     len === CHAIN_LEN_UNLIMITED ? t("filter.unlimited") : String(len);
 }
@@ -434,7 +434,7 @@ function readFilters(): Filters {
   f.tally = activeSeg("tally") as Tally;
   f.proximityDays = Number($<HTMLInputElement>("#f-prox").value) || 90;
   f.crossFormat = activeSeg("xf") as Filters["crossFormat"];
-  f.maxChainLen = lenFromSlider(Number($<HTMLInputElement>("#f-len").value) || 3);
+  f.maxChainLen = lenFromSlider(Number($<HTMLInputElement>("#f-len").value) || 5);
   return f;
 }
 

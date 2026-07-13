@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { Series, Tier } from "../shared/types";
 import type { Filters } from "../src/engine/types";
-import { defaultFilters } from "../src/engine/filters";
+import { CHAIN_LEN_UNLIMITED, defaultFilters } from "../src/engine/filters";
 import { rule1, rule2, rule2All, rule3, performanceTier } from "../src/engine/rules";
 import { judge, buildEdges, findArguments } from "../src/engine/graph";
 
@@ -31,7 +31,7 @@ const F = (o: Partial<Filters> = {}): Filters => ({
   ...defaultFilters(),
   start: null,
   crossFormat: "loose",
-  maxChainLen: 7,
+  maxChainLen: CHAIN_LEN_UNLIMITED,
   ...o,
 });
 
@@ -227,6 +227,17 @@ describe("图搜索与判案", () => {
       judge(data, "A", "B", F({ maxChainLen: len })).forward.some((x) => x.path.length === 2);
     expect(hit(2)).toBe(false); // 有效层 3 > 上限 2
     expect(hit(3)).toBe(true);
+  });
+  it("链长上限支持真实档位 8（物理边数硬上限同步放宽）", () => {
+    // A -规则1-> N1 -规则1-> ... -规则1-> N7 -规则1-> B：8 条边、8 个有效层
+    const nodes = ["A", "N1", "N2", "N3", "N4", "N5", "N6", "N7", "B"];
+    const data = nodes.slice(0, -1).map((from, i) =>
+      s(from, nodes[i + 1], 2, 0, { date: `2024-01-${String(i + 1).padStart(2, "0")}` }),
+    );
+    const hit = (len: number) =>
+      judge(data, "A", "B", F({ maxChainLen: len })).forward.some((x) => x.path.length === 8);
+    expect(hit(7)).toBe(false); // 有效层 8 > 上限 7
+    expect(hit(8)).toBe(true);
   });
   it("无路径给出提示", () => {
     const data = [s("X", "Y", 2, 0)];

@@ -1,6 +1,7 @@
 // 把边/证据描述成文本，供论据卡与一键复制共用。全部经 i18n 的 t()/tc()，随语言切换自动生效。
 import type { Team } from "../../shared/types";
 import type { Argument, Edge, FilterChange, Hint, RuleId, Rule2Note, Scope, SeriesEvidence } from "../engine/types";
+import { CHAIN_LEN_UNLIMITED } from "../engine/filters";
 import { t } from "../i18n";
 
 export type Teams = Map<string, Team>;
@@ -144,7 +145,7 @@ export function formatFilterChange(c: FilterChange): string {
       return t("mouthhard.change.crossFormat", { value: t(`xf.${c.value}`) });
     case "maxChainLen":
       return t("mouthhard.change.maxChainLen", {
-        value: c.value >= 7 ? t("filter.unlimited") : c.value,
+        value: c.value >= CHAIN_LEN_UNLIMITED ? t("filter.unlimited") : c.value,
       });
     case "start":
       return c.value ? t("mouthhard.change.startSet", { date: c.value }) : t("mouthhard.change.startClear");

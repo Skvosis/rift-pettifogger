@@ -1,8 +1,8 @@
 // 全局过滤器：默认值、URL 编解码（判案结果一条链接即可复现）。
 import type { CrossFormat, Filters, Scope, Tally } from "./types";
 
-/** 引擎链长硬上限（= "不限"）。 */
-export const CHAIN_LEN_UNLIMITED = 7;
+/** 链长"不限"哨兵值（明显落在 1–8 真实档位之外，语义见 Filters.maxChainLen）。 */
+export const CHAIN_LEN_UNLIMITED = 99;
 
 /** 默认起始时间：过去三个月（滚动）。 */
 export function defaultStart(): string {
@@ -19,7 +19,7 @@ export function defaultFilters(): Filters {
     tally: "series",
     proximityDays: 90,
     crossFormat: "strict",
-    maxChainLen: 3,
+    maxChainLen: 5,
   };
 }
 
@@ -41,7 +41,7 @@ export function encodeState(a: string | null, b: string | null, f: Filters): str
   if (f.tally !== "series") p.set("tally", f.tally);
   if (f.proximityDays !== 90) p.set("prox", String(f.proximityDays));
   if (f.crossFormat !== "strict") p.set("xf", f.crossFormat);
-  if (f.maxChainLen !== 3) p.set("len", String(f.maxChainLen));
+  if (f.maxChainLen !== 5) p.set("len", String(f.maxChainLen));
   return p.toString();
 }
 
@@ -57,7 +57,7 @@ export function decodeState(query: string): { a: string | null; b: string | null
   const xf = p.get("xf");
   if (xf && CROSS_FORMATS.includes(xf as CrossFormat)) f.crossFormat = xf as CrossFormat;
   const len = Number(p.get("len"));
-  if (Number.isInteger(len) && ((len >= 1 && len <= 5) || len === CHAIN_LEN_UNLIMITED)) {
+  if (Number.isInteger(len) && ((len >= 1 && len <= 8) || len === CHAIN_LEN_UNLIMITED)) {
     f.maxChainLen = len;
   }
   const start = p.get("start");

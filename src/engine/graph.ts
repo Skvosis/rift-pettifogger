@@ -3,9 +3,11 @@ import type { Series } from "../../shared/types";
 import type { Argument, Edge, Filters, Hint, TipKey, Verdict } from "./types";
 import { rule1, rule2All, rule3 } from "./rules";
 import { QUALITY, inTimeWindow } from "./types";
+import { CHAIN_LEN_UNLIMITED } from "./filters";
 
 // 枚举上限，防止稠密图爆炸（仍足以覆盖“展示前 5 条”的需求）。
-const MAX_DEPTH = 7;
+/** 物理边数硬上限（DFS 安全阀，与用户声明的层数上限是两回事，见 findArguments）。 */
+const MAX_DEPTH = 8;
 const MAX_EXPANSIONS = 60000;
 const MAX_RESULTS = 300;
 
@@ -65,32 +67,28 @@ function computeEdges(all: Series[], filters: Filters): Edge[] {
 /** 判案：正方 A>B 与反方 B>A。链长上限取自过滤器。 */
 export function judge(all: Series[], a: string, b: string, filters: Filters): Verdict {
   const edges = buildEdges(all, filters);
-  const maxDepth = clampDepth(filters.maxChainLen);
-  const forward = findArguments(a, b, edges, MAX_RESULTS, maxDepth);
-  const reverse = findArguments(b, a, edges, MAX_RESULTS, maxDepth);
+  const forward = findArguments(a, b, edges, MAX_RESULTS, filters.maxChainLen);
+  const reverse = findArguments(b, a, edges, MAX_RESULTS, filters.maxChainLen);
   const verdict: Verdict = { a, b, forward, reverse };
   if (!forward.length) verdict.hint = suggestRelaxation(all, a, b, filters);
   return verdict;
 }
 
-function clampDepth(n: number): number {
-  return Number.isFinite(n) && n >= 1 ? Math.min(n, MAX_DEPTH) : MAX_DEPTH;
-}
-
 /**
  * 从已建好的边集里找 A→B 的全部论证（直接 + 传递链），强度优先排序。
- * maxResults 供嘴硬模式做存在性检查；maxDepth 为链长上限（边数）。
+ * maxResults 供嘴硬模式做存在性检查；maxLayers 为有效层数上限（1–8 真实档位，
+ * 或 CHAIN_LEN_UNLIMITED 哨兵——其值远大于物理可达层数，天然等同"不限"，无需特判）。
  */
 export function findArguments(
   a: string,
   b: string,
   edges: Edge[],
   maxResults = MAX_RESULTS,
-  maxDepth = MAX_DEPTH,
+  maxLayers = CHAIN_LEN_UNLIMITED,
 ): Argument[] {
-  const depthCapEff = clampDepth(maxDepth) === MAX_DEPTH ? MAX_DEPTH * 2 : clampDepth(maxDepth);
+  const layerCap = Number.isFinite(maxLayers) && maxLayers >= 1 ? maxLayers : CHAIN_LEN_UNLIMITED;
   // 直接边：每条规则各作为一条论证（规则 2 计 2 层，受链长上限约束）
-  const direct = edges.filter((e) => e.from === a && e.to === b && edgeLayers(e) <= depthCapEff);
+  const direct = edges.filter((e) => e.from === a && e.to === b && edgeLayers(e) <= layerCap);
   const args: Argument[] = direct.map((e) => ({ path: [e], chainStrength: chainScore([e]) }));
 
   // 传递链：每个有向对取最强边建简单图
@@ -116,7 +114,7 @@ export function findArguments(
       expansions++;
       if (visited.has(e.to)) continue;
       const nextLayers = layers + edgeLayers(e);
-      if (nextLayers > depthCapEff) continue;
+      if (nextLayers > layerCap) continue;
       const nextPath = [...path, e];
       if (e.to === b) {
         if (nextPath.length >= 2) {
@@ -154,7 +152,7 @@ function suggestRelaxation(all: Series[], a: string, b: string, f: Filters): Hin
   if (!anyA || !anyB) return { kind: "missingData" };
   const tips: TipKey[] = [];
   if (f.start) tips.push("clearStart");
-  if (f.maxChainLen < MAX_DEPTH) tips.push("widenChainLen");
+  if (f.maxChainLen < CHAIN_LEN_UNLIMITED) tips.push("widenChainLen");
   if (f.scope !== "all") tips.push("widenScope");
   if (f.crossFormat !== "loose") tips.push("widenCrossFormat");
   if (f.proximityDays < 180) tips.push("widenProximity");
